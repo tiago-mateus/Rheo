@@ -3,7 +3,7 @@ test("câmera transmite, receptor recarrega, modo OBS e captura encerra", async 
   browser,
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/?camera=1");
   await page.getByRole("button", { name: "Criar transmissão" }).click();
   await page.getByRole("button", { name: "Preparar câmera" }).click();
   await expect(page.locator("video")).toHaveJSProperty("readyState", 4, {
@@ -79,7 +79,7 @@ test("interface mobile cabe na tela e link inválido é explicado", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/");
+  await page.goto("/?camera=1");
   await expect(
     page.getByRole("button", { name: "Criar transmissão" }),
   ).toBeVisible();
@@ -124,7 +124,7 @@ test("prévia continua funcionando se a listagem de dispositivos falhar", async 
       throw new DOMException("Device list unavailable", "NotAllowedError");
     };
   });
-  await page.goto("/");
+  await page.goto("/?camera=1");
   await page.getByRole("button", { name: "Criar transmissão" }).click();
   await page.getByRole("button", { name: "Preparar câmera" }).click();
   await expect(
@@ -143,7 +143,11 @@ test("reprodução da prévia bloqueada oferece nova tentativa por toque", async
     const original = HTMLMediaElement.prototype.play;
     let blocked = false;
     HTMLMediaElement.prototype.play = function () {
-      if (this.srcObject && !blocked) {
+      if (
+        this.srcObject &&
+        this.getAttribute("aria-label") === "Prévia da câmera" &&
+        !blocked
+      ) {
         blocked = true;
         return Promise.reject(
           new DOMException("Playback blocked", "NotAllowedError"),
@@ -152,7 +156,7 @@ test("reprodução da prévia bloqueada oferece nova tentativa por toque", async
       return original.call(this);
     };
   });
-  await page.goto("/");
+  await page.goto("/?camera=1");
   await page.getByRole("button", { name: "Criar transmissão" }).click();
   await page.getByRole("button", { name: "Preparar câmera" }).click();
   await page
@@ -170,7 +174,7 @@ test("segundo receptor espera sem interromper o primeiro e recebe a vaga liberad
   browser,
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/?camera=1");
   await page.getByRole("button", { name: "Criar transmissão" }).click();
   await page.getByRole("button", { name: "Preparar câmera" }).click();
   await expect(
@@ -267,7 +271,7 @@ test("segunda câmera é redirecionada e desliga sua própria captura", async ({
   browser,
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/?camera=1");
   await page.getByRole("button", { name: "Criar transmissão" }).click();
   await page.getByRole("button", { name: "Preparar câmera" }).click();
   await page

@@ -1,0 +1,236 @@
+.operator {
+  max-width: 1280px;
+  margin: auto;
+  padding: 48px 44px;
+}
+.media-details {
+  margin-top: 20px;
+}
+.media-details summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 13px;
+  padding: 10px 0;
+}
+.clean .media-details {
+  display: none;
+}
+.setup-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 420px) minmax(0, 1fr);
+  gap: 80px;
+  align-items: start;
+}
+.room-setup {
+  border-top: 1px solid var(--line);
+  padding-top: 24px;
+}
+.operator label,
+.format-fields label {
+  display: block;
+  margin: 20px 0 8px;
+  font-size: 13px;
+}
+.operator .small {
+  font-size: 12px;
+  margin-top: 16px;
+}
+.dimension-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.format-fields .small {
+  margin-top: 12px;
+}
+.camera-start {
+  display: block;
+  margin-top: 22px;
+  font-size: 13px;
+  text-align: center;
+}
+.format-guide {
+  padding: 28px 0;
+}
+.format-outline {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #819d66;
+  background: #192320;
+  max-width: 100%;
+  max-height: 280px;
+  margin: 0 auto 32px;
+}
+.format-outline span:first-child {
+  font-size: 28px;
+  font-variant-numeric: tabular-nums;
+}
+.format-outline span:last-child {
+  color: var(--muted);
+  font-size: 13px;
+}
+.format-guide h2 {
+  font-size: 25px;
+  line-height: 1.3;
+  margin-bottom: 16px;
+}
+.room-format {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--muted);
+  text-align: right;
+  white-space: nowrap;
+}
+.connection-strip {
+  display: flex;
+  gap: 28px;
+  padding: 18px 0;
+  margin-bottom: 32px;
+  border-block: 1px solid var(--line);
+  font-size: 13px;
+}
+.connection-strip span::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #879489;
+  margin-right: 9px;
+}
+.connection-strip .connected::before {
+  background: var(--accent);
+}
+.room-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 44px;
+}
+.invite-content {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  margin-top: 24px;
+}
+.invite-content > div {
+  min-width: 0;
+  flex: 1;
+}
+.invite-content label {
+  margin-top: 0;
+}
+.invite-qr {
+  width: 176px;
+  height: 176px;
+  flex: 0 0 auto;
+}
+.obs-section {
+  border-left: 1px solid var(--line);
+  padding-left: 36px;
+}
+.obs-dimensions {
+  display: flex;
+  gap: 48px;
+  padding: 18px 0 0;
+  margin-bottom: 0;
+}
+.obs-dimensions dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+.obs-dimensions dd {
+  margin: 5px 0 0;
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+}
+.preview-section {
+  margin-top: 36px;
+  padding-top: 28px;
+  border-top: 1px solid var(--line);
+}
+.preview-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+.preview-heading button {
+  flex-shrink: 0;
+}
+.preview-section iframe {
+  display: block;
+  width: 100%;
+  max-height: 70vh;
+  margin: 24px auto 0;
+  border: 1px solid var(--line);
+  background: #000;
+}
+.room-footer {
+  align-items: center;
+  gap: 30px;
+  margin-top: 32px;
+}
+.room-footer p {
+  font-size: 12px;
+  max-width: 55ch;
+}
+.room-footer .access-actions {
+  margin: 0;
+  flex-shrink: 0;
+}
+.room-unavailable .button {
+  margin-top: 24px;
+}
+@media (max-width: 1000px) {
+  .setup-layout {
+    gap: 40px;
+  }
+  .invite-content {
+    flex-direction: column;
+    align-items: start;
+  }
+  .invite-content > div {
+    width: 100%;
+  }
+}
+@media (max-width: 760px) {
+  .operator {
+    padding: 28px 20px;
+  }
+  .setup-layout,
+  .room-layout {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+  .format-guide {
+    display: none;
+  }
+  .room-format {
+    text-align: left;
+  }
+  .operator .page-heading {
+    flex-direction: column;
+    gap: 16px;
+  }
+  .obs-section {
+    border-left: 0;
+    padding-left: 0;
+    border-top: 1px solid var(--line);
+    padding-top: 28px;
+  }
+  .connection-strip {
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .preview-heading,
+  .room-footer {
+    align-items: start;
+    flex-direction: column;
+  }
+  .room-footer .access-actions {
+    flex-wrap: wrap;
+  }
+}

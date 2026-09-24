@@ -540,7 +540,7 @@ footer {
     gap: 30px;
   }
   .monitor {
-    aspect-ratio: 4/3;
+    aspect-ratio: 16/9;
   }
   .side-panel {
     border-left: 0;

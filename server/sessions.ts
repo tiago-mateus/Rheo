@@ -1,6 +1,9 @@
 import { randomBytes } from "node:crypto";
 import type { Role, SessionKeys } from "../shared/protocol.js";
+import { defaultFormat, type VideoFormat } from "../shared/video.js";
 interface Session extends SessionKeys {
+  format: VideoFormat;
+  managed: boolean;
   expiresAt: number;
   sender?: string;
   viewer?: string;
@@ -12,7 +15,7 @@ export class SessionStore {
     private clock = Date.now,
     private ttl = 4 * 60 * 60 * 1000,
   ) {}
-  create(): SessionKeys {
+  create(format: VideoFormat = defaultFormat, managed = false): SessionKeys {
     this.sweep();
     if (this.sessions.size >= 128)
       throw new Error(
@@ -22,6 +25,9 @@ export class SessionStore {
       id: randomBytes(12).toString("hex"),
       sendToken: randomBytes(24).toString("hex"),
       viewToken: randomBytes(24).toString("hex"),
+      controlToken: randomBytes(24).toString("hex"),
+      format: { ...format },
+      managed,
       expiresAt: this.clock() + this.ttl,
       releasedViewers: new Set<string>(),
     };
@@ -30,6 +36,7 @@ export class SessionStore {
       id: session.id,
       sendToken: session.sendToken,
       viewToken: session.viewToken,
+      controlToken: session.controlToken,
     };
   }
   get(id: string) {

@@ -7,6 +7,7 @@ interface Props {
   error: string;
   notice: string;
   link: string;
+  dimensions?: string;
   onRetry: () => void;
   onCancel: () => void;
   onCopy: () => void;
@@ -18,6 +19,7 @@ export default function SessionNotice({
   error,
   notice,
   link,
+  dimensions = "1280 × 720",
   onRetry,
   onCancel,
   onCopy,
@@ -97,7 +99,7 @@ export default function SessionNotice({
                   <li>
                     No OBS, adicione uma fonte <strong>Navegador</strong>.
                   </li>
-                  <li>Cole o link acima e use 1280 × 720.</li>
+                  <li>Cole o link acima e use {dimensions}.</li>
                   <li>Mantenha a câmera de origem transmitindo.</li>
                 </ol>
               </>

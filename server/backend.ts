@@ -5,6 +5,7 @@ import { WebSocket, WebSocketServer } from "ws";
 import { SessionStore } from "./sessions.js";
 import { iceSettings } from "./ice.js";
 import type { Role } from "../shared/protocol.js";
+import { defaultFormat, validFormat } from "../shared/video.js";
 type Client = {
   socket: WebSocket;
   id: string;
@@ -47,6 +48,7 @@ export function createBackend(options: { publicOrigin?: string } = {}) {
     next();
   });
   app.get("/api/health", (_req, res) => res.json({ ok: true }));
+  app.use(express.json({ limit: "4kb" }));
   app.post("/api/sessions", (req, res) => {
     if (req.headers.origin && req.headers.origin !== expectedOrigin(req)) {
       res.status(403).json({ error: "Origem não permitida." });
@@ -65,10 +67,86 @@ export function createBackend(options: { publicOrigin?: string } = {}) {
     }
     try {
       res.setHeader("Cache-Control", "no-store");
-      res.status(201).json(store.create());
+      const format = req.body?.format ?? defaultFormat;
+      if (!validFormat(format)) {
+        res
+          .status(400)
+          .json({
+            error:
+              "Use dimensões pares entre 240 e 1920, até 1920 × 1080 pixels, e um enquadramento válido.",
+          });
+        return;
+      }
+      res.status(201).json(store.create(format, req.body?.managed === true));
     } catch (error) {
       res.status(503).json({ error: (error as Error).message });
     }
+  });
+  app.get("/api/sessions/:id", (req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    const session = store.get(req.params.id);
+    const token = req.headers.authorization?.replace(/^Bearer /, "");
+    if (
+      !session ||
+      !token ||
+      ![session.sendToken, session.viewToken, session.controlToken].includes(
+        token,
+      )
+    ) {
+      res
+        .status(404)
+        .json({
+          error: "Sala indisponível. Peça um novo convite ao operador.",
+        });
+      return;
+    }
+    res.json({
+      format: session.format,
+      managed: session.managed,
+      senderConnected: !!session.sender,
+      viewerConnected: !!session.viewer,
+      ...(token === session.controlToken
+        ? { sendToken: session.sendToken, viewToken: session.viewToken }
+        : {}),
+    });
+  });
+  app.post("/api/sessions/:id/:action", (req, res) => {
+    if (req.headers.origin && req.headers.origin !== expectedOrigin(req)) {
+      res.status(403).json({ error: "Origem não permitida." });
+      return;
+    }
+    const session = store.get(req.params.id);
+    const token = req.headers.authorization?.replace(/^Bearer /, "");
+    if (!session) {
+      res.status(404).json({ error: "Sala encerrada ou expirada." });
+      return;
+    }
+    if (token !== session.controlToken) {
+      res.status(403).json({ error: "Acesso de controle necessário." });
+      return;
+    }
+    if (req.params.action !== "end" && req.params.action !== "release-viewer") {
+      res.status(404).json({ error: "Ação inválida." });
+      return;
+    }
+    const sender = session.sender ? clients.get(session.sender) : undefined;
+    const viewer = session.viewer ? clients.get(session.viewer) : undefined;
+    if (req.params.action === "end") {
+      store.end(session.id);
+      for (const member of [sender, viewer]) {
+        send(member, { type: "ended" });
+        member?.socket.close(1000);
+      }
+    } else if (viewer) {
+      store.markViewerReleased(session.id, viewer.resumeKey);
+      store.leave(session.id, "viewer", viewer.id);
+      viewer.session = undefined;
+      viewer.role = undefined;
+      send(viewer, { type: "released" });
+      viewer.socket.close(1000, "Released");
+      send(sender, { type: "peer-left" });
+    }
+    res.json({ ok: true });
   });
   wss.on("connection", (socket) => {
     const client: Client = { socket, id: randomUUID(), alive: true };
@@ -170,6 +248,10 @@ export function createBackend(options: { publicOrigin?: string } = {}) {
           return;
         }
         if (message.type === "release-viewer") {
+          if (store.get(client.session)?.managed)
+            throw new Error(
+              "Somente o operador pode liberar a recepção desta sala.",
+            );
           if (client.role !== "sender")
             throw new Error("Somente o transmissor pode liberar o receptor.");
           const viewer = peer(client);
@@ -183,6 +265,8 @@ export function createBackend(options: { publicOrigin?: string } = {}) {
             send(client, { type: "peer-left" });
           }
         } else if (message.type === "end") {
+          if (store.get(client.session)?.managed)
+            throw new Error("Somente o operador pode encerrar esta sala.");
           if (client.role !== "sender")
             throw new Error("Somente o transmissor pode encerrar a sessão.");
           const other = peer(client);

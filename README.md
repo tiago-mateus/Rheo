@@ -1,5 +1,21 @@
 # Rheo
 
+## Começar pelo computador do OBS
+
+1. Abra o Rheo, escolha formato (horizontal, vertical, quadrado ou personalizado), resolução e enquadramento. Clique em **Criar sala para OBS**.
+2. Envie o **Convite da câmera** para quem vai filmar, ou peça para ler o QR code. O QR é gerado no navegador; o convite não é enviado a um serviço externo.
+3. No celular, permita câmera/microfone, confira a prévia e toque em **Iniciar transmissão**. **Parar câmera** libera os dispositivos sem encerrar a sala; é possível preparar e iniciar novamente com o mesmo convite.
+4. No OBS, crie uma fonte **Navegador**, cole o **Link para OBS** e configure a largura e altura mostradas no painel. Para preencher a cena, a tela do OBS também deve ter a proporção desejada.
+5. O painel pode ficar aberto. **Conferir prévia** ocupa temporariamente a vaga de recepção; **Liberar para o OBS** fecha essa prévia e copia o link. **Encerrar sala**, no painel, invalida os convites e interrompe a transmissão.
+
+O endereço `/studio/…` é privado do operador. Compartilhe apenas o convite `/send/…` ou o link `/view/…`. Os três acessos têm credenciais separadas. Para começar pelo celular, use **Quero transmitir pelo celular** na página inicial.
+
+### Resolução e orientação
+
+O formato é definido ao criar a sala: 720p, 1080p ou dimensões personalizadas pares (240–1920 por eixo, até 2.073.600 pixels). A saída mantém essas dimensões quando o celular gira. **Imagem inteira** acrescenta barras quando necessário; **Preencher** corta as bordas. Nenhum modo estica a imagem. Para uma cena horizontal ampla, filme com o celular deitado.
+
+O enquadramento usa canvas no aparelho que filma, preservando o áudio original. Isso usa processamento/bateria do celular; não melhora os detalhes de uma câmera de resolução inferior. Mantenha a página em primeiro plano. A qualidade efetivamente recebida ainda depende da rede e do encoder do navegador. Para mudar o formato, crie outra sala. Sessões continuam em memória: reiniciar/deployar o servidor invalida os links.
+
 MVP local de câmera remota: câmera e microfone → WebRTC → navegador ou OBS. Uma câmera e um receptor por sessão. Interface em português, sem cadastro e sem gravação no servidor.
 
 ## Começar no computador

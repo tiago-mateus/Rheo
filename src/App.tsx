@@ -3,6 +3,9 @@ import type { AccessIssue, Role, SessionKeys } from "../shared/protocol";
 import { RtcSession, type Stats } from "./rtc";
 import { obsLink, sessionLocation } from "./links";
 import SessionNotice from "./SessionNotice";
+import { defaultFormat, type VideoFormat } from "../shared/video";
+import { frameCamera } from "./capture";
+import FormatFields from "./FormatFields";
 type Route = { role: Role; id: string; token: string };
 function currentRoute(): Route | null {
   const match = location.pathname.match(
@@ -60,6 +63,10 @@ export default function App() {
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [camera, setCamera] = useState("");
   const [microphone, setMicrophone] = useState("");
+  const [format, setFormat] = useState<VideoFormat>({ ...defaultFormat });
+  const [formatReady, setFormatReady] = useState(!route);
+  const [managed, setManaged] = useState(false);
+  const capture = useRef<Awaited<ReturnType<typeof frameCamera>> | null>(null);
   const [viewToken, setViewToken] = useState(() => {
     try {
       return route ? sessionStorage.getItem("rheo-view-" + route.id) || "" : "";
@@ -118,6 +125,8 @@ export default function App() {
         });
   }
   function finish() {
+    capture.current?.stop();
+    capture.current = null;
     local.current?.getTracks().forEach((t) => t.stop());
     local.current = null;
     attach(null);
@@ -143,6 +152,8 @@ export default function App() {
             : "Recepção liberada",
       );
       if (!receiver) {
+        capture.current?.stop();
+        capture.current = null;
         local.current?.getTracks().forEach((track) => track.stop());
         local.current = null;
         attach(null);
@@ -173,6 +184,7 @@ export default function App() {
   function connect(stream: MediaStream | null) {
     if (!route) return;
     setError("");
+    setNotice("");
     setActive(true);
     const client = new RtcSession(
       route.id,
@@ -200,9 +212,40 @@ export default function App() {
     return () => {
       call.current?.dispose();
       call.current = null;
+      capture.current?.stop();
+      capture.current = null;
       local.current?.getTracks().forEach((t) => t.stop());
     };
   }, [route?.id, route?.role]);
+  useEffect(() => {
+    if (!route) return;
+    const abort = new AbortController();
+    setFormatReady(false);
+    void fetch("/api/sessions/" + route.id, {
+      headers: { Authorization: "Bearer " + route.token },
+      signal: abort.signal,
+    })
+      .then(async (response) => {
+        if (response.status === 404) {
+          if (!receiver) showAccessIssue("expired");
+          return;
+        }
+        if (!response.ok)
+          throw new Error(
+            "Não foi possível carregar o formato. Atualize a página para tentar novamente.",
+          );
+        const data = await response.json();
+        if (!abort.signal.aborted) {
+          setFormat(data.format);
+          setManaged(data.managed);
+          setFormatReady(true);
+        }
+      })
+      .catch((e) => {
+        if (!abort.signal.aborted) setError((e as Error).message);
+      });
+    return () => abort.abort();
+  }, [route?.id, route?.token]);
   useEffect(() => {
     document.body.classList.toggle("clean", clean && receiver && !accessIssue);
     return () => document.body.classList.remove("clean");
@@ -231,7 +274,11 @@ export default function App() {
     setBusy(true);
     setError("");
     try {
-      const response = await fetch("/api/sessions", { method: "POST" });
+      const response = await fetch("/api/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ format }),
+      });
       const data = await response.json();
       if (!response.ok)
         throw new Error(data.error || "Não foi possível criar a sessão.");
@@ -256,6 +303,7 @@ export default function App() {
   async function prepare() {
     setBusy(true);
     setError("");
+    setNotice("");
     if (!navigator.mediaDevices?.getUserMedia) {
       setError(
         "A câmera exige HTTPS ou localhost. No celular, execute npm run dev:https e abra o endereço de rede indicado no terminal.",
@@ -263,14 +311,16 @@ export default function App() {
       setBusy(false);
       return;
     }
+    capture.current?.stop();
+    capture.current = null;
     local.current?.getTracks().forEach((t) => t.stop());
     local.current = null;
     setPrepared(false);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
+      const raw = await navigator.mediaDevices.getUserMedia({
         video: {
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
+          width: { ideal: format.width },
+          height: { ideal: format.height },
           frameRate: { ideal: 30, max: 30 },
           ...(camera
             ? { deviceId: { exact: camera } }
@@ -285,6 +335,8 @@ export default function App() {
                 ...(microphone ? { deviceId: { exact: microphone } } : {}),
               },
       });
+      capture.current = await frameCamera(raw, format);
+      const stream = capture.current.stream;
       stream.getAudioTracks().forEach((track) => {
         track.enabled = !muted;
       });
@@ -302,7 +354,7 @@ export default function App() {
         });
       setPrepared(true);
       setStatus("Câmera preparada");
-      for (const track of stream.getTracks())
+      for (const track of raw.getTracks())
         track.onended = () => {
           setError(
             "A captura foi interrompida pelo dispositivo. Encerre a sessão e crie uma nova transmissão.",
@@ -322,6 +374,8 @@ export default function App() {
     } else {
       call.current?.dispose();
       call.current = null;
+      capture.current?.stop();
+      capture.current = null;
       local.current = null;
       attach(null);
       setActive(false);
@@ -329,6 +383,21 @@ export default function App() {
       setStatus("Prepare sua câmera");
       setError("");
     }
+  }
+  function stopCamera() {
+    call.current?.dispose();
+    call.current = null;
+    capture.current?.stop();
+    capture.current = null;
+    local.current = null;
+    attach(null);
+    setPrepared(false);
+    setActive(false);
+    setEnded(false);
+    setStatus("Câmera desligada");
+    setNotice(
+      "A sala continua aberta. Prepare a câmera para transmitir novamente.",
+    );
   }
   async function copy(text: string) {
     try {
@@ -383,6 +452,7 @@ export default function App() {
         error={error}
         notice={notice}
         link={receiver ? obsLink(location.href) : ""}
+        dimensions={`${format.width} × ${format.height}`}
         onRetry={retryAccess}
         onCancel={releaseReception}
         onCopy={() => copy(obsLink(location.href))}
@@ -410,13 +480,17 @@ export default function App() {
               {receiver
                 ? "Receber transmissão"
                 : route
-                  ? "Sua câmera, conectada."
+                  ? active
+                    ? "Sua câmera está transmitindo."
+                    : "Prepare sua câmera."
                   : "A próxima cena começa aqui."}
             </h1>
             <p>
               {receiver
                 ? "Uma imagem limpa, pronta para entrar na sua produção."
-                : "Envie câmera e áudio direto para outro navegador ou para o OBS."}
+                : route && !viewToken
+                  ? "O operador já configurou a sala. Confira a imagem e inicie quando estiver pronto."
+                  : "Envie câmera e áudio direto para outro navegador ou para o OBS."}
             </p>
           </div>
           <span className="session-label">
@@ -437,7 +511,10 @@ export default function App() {
         )}
         <div className="studio">
           <section className="monitor-section" aria-label="Monitor da câmera">
-            <div className="monitor">
+            <div
+              className="monitor"
+              style={{ aspectRatio: `${format.width} / ${format.height}` }}
+            >
               <video
                 ref={video}
                 autoPlay
@@ -507,7 +584,7 @@ export default function App() {
                 {route && !receiver && !ended && !active && (
                   <button
                     className="primary"
-                    disabled={busy}
+                    disabled={busy || !formatReady}
                     onClick={prepared ? () => connect(local.current) : prepare}
                   >
                     {busy
@@ -533,9 +610,11 @@ export default function App() {
                     </button>
                     <button
                       className="danger"
-                      onClick={() => call.current?.end()}
+                      onClick={() =>
+                        managed ? stopCamera() : call.current?.end()
+                      }
                     >
-                      Encerrar transmissão
+                      {managed ? "Parar câmera" : "Encerrar transmissão"}
                     </button>
                   </>
                 )}
@@ -549,36 +628,41 @@ export default function App() {
                 )}
               </div>
             </div>
-            <dl className="telemetry">
-              <div>
-                <dt>Conexão</dt>
-                <dd>{stats.route || "—"}</dd>
-              </div>
-              <div>
-                <dt>Vídeo</dt>
-                <dd>{stats.resolution || "—"}</dd>
-              </div>
-              <div>
-                <dt>Quadros/s</dt>
-                <dd>{stats.fps !== undefined ? Math.round(stats.fps) : "—"}</dd>
-              </div>
-              <div>
-                <dt>Bitrate</dt>
-                <dd>
-                  {stats.bitrate !== undefined
-                    ? (stats.bitrate / 1000).toFixed(2) + " Mbps"
-                    : "—"}
-                </dd>
-              </div>
-              <div>
-                <dt>RTT de rede</dt>
-                <dd>{stats.rtt !== undefined ? stats.rtt + " ms" : "—"}</dd>
-              </div>
-            </dl>
-            <p className="stats-note">
-              Métricas aparecem durante a conexão. RTT mede ida e volta na rede,
-              não o atraso total do vídeo.
-            </p>
+            <details className="media-details" open={!managed}>
+              <summary>Dados da conexão</summary>
+              <dl className="telemetry">
+                <div>
+                  <dt>Conexão</dt>
+                  <dd>{stats.route || "—"}</dd>
+                </div>
+                <div>
+                  <dt>Vídeo</dt>
+                  <dd>{stats.resolution || "—"}</dd>
+                </div>
+                <div>
+                  <dt>Quadros/s</dt>
+                  <dd>
+                    {stats.fps !== undefined ? Math.round(stats.fps) : "—"}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Bitrate</dt>
+                  <dd>
+                    {stats.bitrate !== undefined
+                      ? (stats.bitrate / 1000).toFixed(2) + " Mbps"
+                      : "—"}
+                  </dd>
+                </div>
+                <div>
+                  <dt>RTT de rede</dt>
+                  <dd>{stats.rtt !== undefined ? stats.rtt + " ms" : "—"}</dd>
+                </div>
+              </dl>
+              <p className="stats-note">
+                Métricas aparecem durante a conexão. RTT mede ida e volta na
+                rede, não o atraso total do vídeo.
+              </p>
+            </details>
           </section>
           <aside className="side-panel">
             {!receiver ? (
@@ -594,6 +678,8 @@ export default function App() {
                     onChange={(e) => {
                       setCamera(e.target.value);
                       if (prepared) {
+                        capture.current?.stop();
+                        capture.current = null;
                         local.current?.getTracks().forEach((t) => t.stop());
                         local.current = null;
                         attach(null);
@@ -618,6 +704,8 @@ export default function App() {
                     onChange={(e) => {
                       setMicrophone(e.target.value);
                       if (prepared) {
+                        capture.current?.stop();
+                        capture.current = null;
                         local.current?.getTracks().forEach((t) => t.stop());
                         local.current = null;
                         attach(null);
@@ -635,17 +723,35 @@ export default function App() {
                         </option>
                       ))}
                   </select>
-                  <div className="quality">
-                    <span>Qualidade solicitada</span>
-                    <strong>720p / 30 fps</strong>
-                  </div>
+                  {!route ? (
+                    <FormatFields value={format} onChange={setFormat} />
+                  ) : (
+                    <div className="quality">
+                      <span>Formato de saída</span>
+                      <strong>
+                        {format.width} × {format.height} / 30 fps
+                      </strong>
+                    </div>
+                  )}
                   <p className="small">
-                    A qualidade real depende da câmera e da conexão. Mantenha
-                    esta página em primeiro plano no celular.
+                    {format.fit === "contain"
+                      ? "Imagem inteira, com barras se necessário."
+                      : "Imagem preenchida, com corte nas bordas."}{" "}
+                    {format.width > format.height
+                      ? "Prefira filmar com o celular deitado. "
+                      : ""}
+                    Mantenha esta página em primeiro plano no celular. A
+                    qualidade real depende da câmera e da conexão.
                   </p>
                 </section>
                 <section>
-                  <h2>Conectar o receptor</h2>
+                  <h2>
+                    {viewLink
+                      ? "Conectar o receptor"
+                      : route
+                        ? "Conectada à produção"
+                        : "Conectar o receptor"}
+                  </h2>
                   {viewLink ? (
                     <>
                       <label htmlFor="view-link">Link de recepção</label>
@@ -680,7 +786,11 @@ export default function App() {
                       )}
                     </>
                   ) : (
-                    <p>O link aparece depois que você criar a transmissão.</p>
+                    <p>
+                      {route
+                        ? "O operador já tem o link para OBS. Prepare a câmera e toque em Iniciar transmissão; não precisa enviar outro link."
+                        : "O link aparece depois que você criar a transmissão."}
+                    </p>
                   )}
                 </section>
               </>
@@ -705,8 +815,17 @@ export default function App() {
               </section>
             )}
             <section className="instructions">
-              <h2>{receiver ? "Durante a transmissão" : "Como usar no OBS"}</h2>
-              {receiver ? (
+              <h2>
+                {receiver || managed
+                  ? "Durante a transmissão"
+                  : "Como usar no OBS"}
+              </h2>
+              {managed && !receiver ? (
+                <p>
+                  O operador recebe a imagem no computador. Use Parar câmera
+                  para fazer uma pausa sem encerrar a sala.
+                </p>
+              ) : receiver ? (
                 <p>
                   Se a imagem parar, confira a câmera de origem e tente
                   reconectar.

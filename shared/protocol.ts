@@ -4,6 +4,7 @@ export interface SessionKeys {
   id: string;
   sendToken: string;
   viewToken: string;
+  controlToken: string;
 }
 export interface IceSettings {
   iceServers: RTCIceServer[];
