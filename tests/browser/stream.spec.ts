@@ -115,3 +115,53 @@ test("receptor HTTP na rede local conecta sem exigir contexto seguro", async ({
   ).toBeVisible();
   await expect(page.getByRole("alert")).toHaveCount(0);
 });
+
+test("prévia continua funcionando se a listagem de dispositivos falhar", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    navigator.mediaDevices.enumerateDevices = async () => {
+      throw new DOMException("Device list unavailable", "NotAllowedError");
+    };
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Criar transmissão" }).click();
+  await page.getByRole("button", { name: "Preparar câmera" }).click();
+  await expect(
+    page.getByRole("button", { name: "Iniciar transmissão", exact: true }),
+  ).toBeVisible({ timeout: 20000 });
+  await expect(page.locator("video")).toHaveJSProperty("readyState", 4, {
+    timeout: 20000,
+  });
+  await expect(page.getByRole("alert")).toHaveCount(0);
+});
+
+test("reprodução da prévia bloqueada oferece nova tentativa por toque", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const original = HTMLMediaElement.prototype.play;
+    let blocked = false;
+    HTMLMediaElement.prototype.play = function () {
+      if (this.srcObject && !blocked) {
+        blocked = true;
+        return Promise.reject(
+          new DOMException("Playback blocked", "NotAllowedError"),
+        );
+      }
+      return original.call(this);
+    };
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Criar transmissão" }).click();
+  await page.getByRole("button", { name: "Preparar câmera" }).click();
+  await page
+    .getByRole("button", { name: "Mostrar prévia", exact: true })
+    .click({ timeout: 20000 });
+  await expect(page.locator("video")).toHaveJSProperty("readyState", 4, {
+    timeout: 20000,
+  });
+  await expect(
+    page.getByRole("button", { name: "Mostrar prévia", exact: true }),
+  ).toHaveCount(0);
+});

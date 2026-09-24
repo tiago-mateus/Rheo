@@ -61,6 +61,7 @@ export default function App() {
   const [hasTurn, setHasTurn] = useState<boolean | null>(null);
   const [stats, setStats] = useState<Stats>({});
   const [audioBlocked, setAudioBlocked] = useState(false);
+  const [previewBlocked, setPreviewBlocked] = useState(false);
   const [muted, setMuted] = useState(false);
   const [clean, setClean] = useState(
     new URLSearchParams(location.search).get("clean") === "1",
@@ -81,12 +82,29 @@ export default function App() {
         viewToken
       : "";
   function attach(stream: MediaStream | null) {
-    if (!video.current) return;
-    video.current.srcObject = stream;
+    const element = video.current;
+    if (!element) return;
+    setPreviewBlocked(false);
+    setAudioBlocked(false);
+    // Set the DOM properties before attaching media; mobile playback policies
+    // must see an inline, muted local preview from the first frame.
+    element.muted = !receiver;
+    element.defaultMuted = !receiver;
+    element.playsInline = true;
+    element.srcObject = stream;
     if (stream)
-      void video.current.play().catch(() => {
-        if (receiver) setAudioBlocked(true);
-      });
+      void element
+        .play()
+        .then(() => {
+          if (element.srcObject !== stream) return;
+          setPreviewBlocked(false);
+          setAudioBlocked(false);
+        })
+        .catch(() => {
+          if (element.srcObject !== stream) return;
+          if (receiver) setAudioBlocked(true);
+          else setPreviewBlocked(true);
+        });
   }
   function finish() {
     local.current?.getTracks().forEach((t) => t.stop());
@@ -210,7 +228,16 @@ export default function App() {
       });
       local.current = stream;
       attach(stream);
-      setDevices(await navigator.mediaDevices.enumerateDevices());
+      // Device labels are optional. Never hide a live preview while waiting
+      // for enumerateDevices, which may fail or hang on mobile browsers.
+      void navigator.mediaDevices
+        .enumerateDevices()
+        .then(setDevices)
+        .catch(() => {
+          setNotice(
+            "Câmera aberta. A lista de dispositivos não está disponível neste navegador.",
+          );
+        });
       setPrepared(true);
       setStatus("Câmera preparada");
       for (const track of stream.getTracks())
@@ -256,6 +283,21 @@ export default function App() {
     if (next) url.searchParams.set("clean", "1");
     else url.searchParams.delete("clean");
     history.replaceState(null, "", url);
+  }
+  async function retryPreview() {
+    const element = video.current;
+    if (!element || !local.current) return;
+    element.muted = true;
+    element.playsInline = true;
+    try {
+      await element.play();
+      setPreviewBlocked(false);
+      setError("");
+    } catch {
+      setError(
+        "O navegador não reproduziu a prévia. Abra o link diretamente no Chrome ou Safari e tente novamente.",
+      );
+    }
   }
   async function enableAudio() {
     if (video.current) {
@@ -361,6 +403,11 @@ export default function App() {
                   </span>
                 )}
               </div>
+              {previewBlocked && !receiver && (
+                <button className="audio-unlock primary" onClick={retryPreview}>
+                  Mostrar prévia
+                </button>
+              )}
               {audioBlocked && (
                 <button className="audio-unlock primary" onClick={enableAudio}>
                   Ativar áudio
