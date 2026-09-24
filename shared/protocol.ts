@@ -1,4 +1,5 @@
 export type Role = "sender" | "viewer";
+export type AccessIssue = "busy" | "expired" | "released";
 export interface SessionKeys {
   id: string;
   sendToken: string;
@@ -15,6 +16,12 @@ export type Signal =
   | { type: "description"; description: RTCSessionDescriptionInit }
   | { type: "candidate"; candidate: RTCIceCandidateInit }
   | { type: "peer-left" }
+  | { type: "release-viewer" }
+  | { type: "released" }
   | { type: "end" }
   | { type: "ended" }
-  | { type: "error"; message: string };
+  | {
+      type: "error";
+      message: string;
+      code?: "ROLE_OCCUPIED" | "SESSION_EXPIRED";
+    };

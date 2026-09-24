@@ -165,3 +165,151 @@ test("reprodução da prévia bloqueada oferece nova tentativa por toque", async
     page.getByRole("button", { name: "Mostrar prévia", exact: true }),
   ).toHaveCount(0);
 });
+
+test("segundo receptor espera sem interromper o primeiro e recebe a vaga liberada", async ({
+  browser,
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Criar transmissão" }).click();
+  await page.getByRole("button", { name: "Preparar câmera" }).click();
+  await expect(
+    page.getByRole("button", { name: "Iniciar transmissão", exact: true }),
+  ).toBeVisible({ timeout: 20000 });
+  await page
+    .getByRole("button", { name: "Iniciar transmissão", exact: true })
+    .click();
+  const link = await page.getByLabel("Link de recepção").inputValue();
+  const firstContext = await browser.newContext();
+  const first = await firstContext.newPage();
+  const nextContext = await browser.newContext();
+  const next = await nextContext.newPage();
+  try {
+    await first.goto(link);
+    await expect(first.locator("video")).toHaveJSProperty("readyState", 4, {
+      timeout: 20000,
+    });
+    await next.goto(link);
+    await expect(next).toHaveURL(/\/status\/busy\/view\//);
+    await expect(
+      next.getByRole("heading", { name: "Este link já está em uso" }),
+    ).toBeVisible();
+    await expect(first.locator("video")).toHaveJSProperty("readyState", 4);
+    await next.screenshot({
+      path: "test-results/session-state.png",
+      fullPage: true,
+    });
+    await next.reload();
+    await expect(
+      next.getByRole("heading", { name: "Este link já está em uso" }),
+    ).toBeVisible();
+    await page
+      .getByRole("button", { name: "Liberar receptor", exact: true })
+      .click();
+    await expect(
+      first.getByRole("heading", { name: "Recepção liberada" }),
+    ).toBeVisible();
+    await expect(next.locator("video")).toHaveJSProperty("readyState", 4, {
+      timeout: 20000,
+    });
+    await expect(next).toHaveURL(/\/view\//);
+    expect(new URL(next.url()).pathname.startsWith("/status/")).toBe(false);
+    await next
+      .getByRole("button", { name: "Liberar para o OBS", exact: true })
+      .click();
+    await expect(
+      next.getByRole("heading", { name: "Recepção liberada" }),
+    ).toBeVisible();
+    await next.screenshot({
+      path: "test-results/session-state.png",
+      fullPage: true,
+    });
+    await next.reload();
+    await expect(
+      next.getByRole("heading", { name: "Recepção liberada" }),
+    ).toBeVisible();
+    const obs = await nextContext.newPage();
+    const obsUrl = new URL(await next.getByLabel("Link para OBS").inputValue());
+    expect(obsUrl.searchParams.get("clean")).toBe("1");
+    await obs.goto(obsUrl.href);
+    await expect(obs.locator("video")).toHaveJSProperty("readyState", 4, {
+      timeout: 20000,
+    });
+    await expect(
+      first.getByRole("heading", { name: "Recepção liberada" }),
+    ).toBeVisible();
+    await expect(
+      next.getByRole("heading", { name: "Recepção liberada" }),
+    ).toBeVisible();
+    await page
+      .getByRole("button", { name: "Encerrar transmissão", exact: true })
+      .click();
+  } finally {
+    await firstContext.close();
+    await nextContext.close();
+  }
+});
+test("link expirado mostra saída clara e nunca ocupa nova sessão", async ({
+  page,
+}) => {
+  await page.goto("/view/missing#token=invalid");
+  await expect(page).toHaveURL(/\/status\/expired\/view\//);
+  await expect(
+    page.getByRole("heading", { name: "Este link não está mais disponível" }),
+  ).toBeVisible();
+  await expect(page.getByRole("alert")).toContainText(/novo link/i);
+  await expect(
+    page.getByRole("link", { name: "Voltar ao início" }),
+  ).toBeVisible();
+});
+
+test("segunda câmera é redirecionada e desliga sua própria captura", async ({
+  browser,
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Criar transmissão" }).click();
+  await page.getByRole("button", { name: "Preparar câmera" }).click();
+  await page
+    .getByRole("button", { name: "Iniciar transmissão", exact: true })
+    .click({ timeout: 20000 });
+  await expect(
+    page.getByText("Aguardando receptor", { exact: true }),
+  ).toBeVisible();
+  const context = await browser.newContext();
+  const duplicate = await context.newPage();
+  try {
+    await duplicate.goto(page.url());
+    await duplicate.getByRole("button", { name: "Preparar câmera" }).click();
+    await expect(
+      duplicate.getByRole("button", {
+        name: "Iniciar transmissão",
+        exact: true,
+      }),
+    ).toBeVisible({ timeout: 20000 });
+    await duplicate.evaluate(() => {
+      (
+        window as unknown as { capturedTracks: MediaStreamTrack[] }
+      ).capturedTracks = (
+        document.querySelector("video")!.srcObject as MediaStream
+      ).getTracks();
+    });
+    await duplicate
+      .getByRole("button", { name: "Iniciar transmissão", exact: true })
+      .click();
+    await expect(duplicate).toHaveURL(/\/status\/busy\/send\//);
+    expect(
+      await duplicate.evaluate(() =>
+        (
+          window as unknown as { capturedTracks: MediaStreamTrack[] }
+        ).capturedTracks.every((track) => track.readyState === "ended"),
+      ),
+    ).toBe(true);
+    await expect(page.locator("video")).toHaveJSProperty("readyState", 4);
+    await page
+      .getByRole("button", { name: "Encerrar transmissão", exact: true })
+      .click();
+  } finally {
+    await context.close();
+  }
+});

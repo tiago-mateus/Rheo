@@ -112,5 +112,12 @@ MVP de teste local, não um serviço público endurecido. Não inclui multicâme
 
 [Publicar no Render](https://render.com/deploy?repo=https%3A%2F%2Fgithub.com%2Ftiago-mateus%2FRheo)
 
-
 O projeto inclui `render.yaml` para o plano gratuito. Consulte [o guia de deploy](docs/render.md). A origem HTTPS pública é detectada automaticamente no Render.
+
+## Links ocupados e troca para o OBS
+
+- **Link ocupado:** o segundo receptor vai para uma página de espera e tenta entrar automaticamente a cada três segundos. O receptor atual continua funcionando.
+- **Liberar para o OBS:** no navegador receptor, copia o link limpo para OBS e libera a vaga. A página liberada não reconecta automaticamente, inclusive após recarregar.
+- **Liberar receptor:** no aparelho transmissor, desconecta o receptor atual para liberar a vaga ao próximo acesso. A conexão liberada é lembrada para não voltar sozinha após uma queda de rede; uma nova tentativa explícita continua permitida.
+- **Sessão expirada:** aparece uma página orientando a pedir um novo link ou criar outra transmissão. Reinícios e novos deploys ainda invalidam as sessões em memória; crie uma sessão nova após o deploy.
+- Para assistir em outro computador, compartilhe **Link de recepção**, não a URL da câmera que começa com /send/.

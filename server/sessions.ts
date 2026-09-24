@@ -4,6 +4,7 @@ interface Session extends SessionKeys {
   expiresAt: number;
   sender?: string;
   viewer?: string;
+  releasedViewers: Set<string>;
 }
 export class SessionStore {
   private sessions = new Map<string, Session>();
@@ -22,6 +23,7 @@ export class SessionStore {
       sendToken: randomBytes(24).toString("hex"),
       viewToken: randomBytes(24).toString("hex"),
       expiresAt: this.clock() + this.ttl,
+      releasedViewers: new Set<string>(),
     };
     this.sessions.set(session.id, session);
     return {
@@ -56,6 +58,20 @@ export class SessionStore {
   leave(id: string, role: Role, connection: string) {
     const session = this.get(id);
     if (session?.[role] === connection) delete session[role];
+  }
+  markViewerReleased(id: string, resumeKey?: string) {
+    const session = this.get(id);
+    if (session && resumeKey) {
+      // Only recent connection identities need protection from automatic retry.
+      if (session.releasedViewers.size >= 128)
+        session.releasedViewers.delete(
+          session.releasedViewers.values().next().value!,
+        );
+      session.releasedViewers.add(resumeKey);
+    }
+  }
+  isViewerReleased(id: string, resumeKey: string) {
+    return this.get(id)?.releasedViewers.has(resumeKey) ?? false;
   }
   end(id: string) {
     this.sessions.delete(id);

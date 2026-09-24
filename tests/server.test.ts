@@ -44,7 +44,7 @@ test("sinalização autentica, isola, limita receptores e encerra a sessão", as
     await viewer.wait("joined");
     await sender.wait("ready");
     const extra = await connect(a.id, a.viewToken);
-    assert.match((await extra.wait("error")).message, /uso/i);
+    assert.equal((await extra.wait("error")).code, "ROLE_OCCUPIED");
     sender = await connect(a.id, a.sendToken, "resume-secret");
     await sender.wait("joined");
     await sender.wait("ready");
@@ -56,15 +56,23 @@ test("sinalização autentica, isola, limita receptores e encerra a sessão", as
     assert.deepEqual(await viewer.wait("description"), payload);
     viewer.ws.close();
     await sender.wait("peer-left");
-    const again = await connect(a.id, a.viewToken);
+    const again = await connect(a.id, a.viewToken, "released-viewer-key");
     await again.wait("joined");
     await sender.wait("ready");
     again.ws.send(JSON.stringify({ type: "end" }));
     assert.match((await again.wait("error")).message, /transmissor/i);
+    again.ws.send(JSON.stringify({ type: "release-viewer" }));
+    assert.match((await again.wait("error")).message, /transmissor/i);
+    sender.ws.send(JSON.stringify({ type: "release-viewer" }));
+    await again.wait("released");
+    const ghost = await connect(a.id, a.viewToken, "released-viewer-key");
+    await ghost.wait("released");
+    const afterRelease = await connect(a.id, a.viewToken);
+    await afterRelease.wait("joined");
     sender.ws.send(JSON.stringify({ type: "end" }));
-    await again.wait("ended");
+    await afterRelease.wait("ended");
     const expired = await connect(a.id, a.viewToken);
-    await expired.wait("error");
+    assert.equal((await expired.wait("error")).code, "SESSION_EXPIRED");
   } finally {
     for (const ws of clients) ws.terminate();
     await backend.close();

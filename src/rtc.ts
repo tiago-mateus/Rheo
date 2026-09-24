@@ -1,4 +1,9 @@
-import type { IceSettings, Role, Signal } from "../shared/protocol";
+import type {
+  AccessIssue,
+  IceSettings,
+  Role,
+  Signal,
+} from "../shared/protocol";
 export interface Stats {
   bitrate?: number;
   fps?: number;
@@ -14,12 +19,14 @@ interface Callbacks {
   ended: () => void;
   config: (config: IceSettings) => void;
   stats: (stats: Stats) => void;
+  access: (issue: AccessIssue | null) => void;
 }
 export class RtcSession {
   private socket?: WebSocket;
   private pc?: RTCPeerConnection;
   private stopped = false;
   private terminal = false;
+  private waiting = false;
   private attempt = 0;
   private iceAttempts = 0;
   private reconnectTimer?: ReturnType<typeof setTimeout>;
@@ -77,6 +84,10 @@ export class RtcSession {
     socket.onclose = () => {
       if (this.socket !== socket || this.stopped || this.terminal) return;
       this.closePeer();
+      if (this.waiting) {
+        this.reconnectTimer = setTimeout(() => this.connect(), 3000);
+        return;
+      }
       if (this.attempt >= 5) {
         this.callbacks.status("Desconectado");
         this.callbacks.error(
@@ -105,6 +116,9 @@ export class RtcSession {
         );
         return;
       }
+      this.waiting = false;
+      this.callbacks.access(null);
+      this.callbacks.error("");
       this.config = message.config;
       this.callbacks.config(message.config);
       this.attempt = 0;
@@ -157,7 +171,26 @@ export class RtcSession {
     } else if (message.type === "ended") {
       this.dispose();
       this.callbacks.ended();
+    } else if (message.type === "released") {
+      this.dispose();
+      this.callbacks.access("released");
     } else if (message.type === "error") {
+      if (message.code === "ROLE_OCCUPIED") {
+        this.waiting = this.role === "viewer";
+        this.terminal = !this.waiting;
+        this.closePeer();
+        if (this.role === "sender")
+          this.stream?.getTracks().forEach((track) => track.stop());
+        this.callbacks.error("");
+        this.callbacks.access("busy");
+        this.socket?.close();
+        return;
+      }
+      if (message.code === "SESSION_EXPIRED") {
+        this.dispose();
+        this.callbacks.access("expired");
+        return;
+      }
       this.terminal = true;
       this.closePeer();
       this.socket?.close();
@@ -300,6 +333,9 @@ export class RtcSession {
     this.previous = undefined;
     this.callbacks.remote(null);
     this.callbacks.stats({});
+  }
+  releaseViewer() {
+    this.send({ type: "release-viewer" });
   }
   end() {
     this.send({ type: "end" });

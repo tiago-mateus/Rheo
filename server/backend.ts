@@ -107,6 +107,7 @@ export function createBackend(options: { publicOrigin?: string } = {}) {
           if (!role) {
             send(client, {
               type: "error",
+              code: "SESSION_EXPIRED",
               message:
                 "Link inválido ou sessão expirada. Peça um novo link ao transmissor.",
             });
@@ -121,6 +122,15 @@ export function createBackend(options: { publicOrigin?: string } = {}) {
             message.resumeKey.length <= 128
               ? message.resumeKey
               : undefined;
+          if (
+            role === "viewer" &&
+            resumeKey &&
+            store.isViewerReleased(message.id, resumeKey)
+          ) {
+            send(client, { type: "released" });
+            socket.close(1000, "Released");
+            return;
+          }
           if (previous && resumeKey && previous.resumeKey === resumeKey) {
             store.leave(message.id, role, previous.id);
             previous.session = undefined;
@@ -131,8 +141,9 @@ export function createBackend(options: { publicOrigin?: string } = {}) {
           if (!store.join(message.id, role, client.id)) {
             send(client, {
               type: "error",
+              code: "ROLE_OCCUPIED",
               message:
-                "Este link já está em uso. Feche o outro receptor ou transmissor e tente novamente.",
+                "Este link já está em uso. Aguarde a liberação do receptor.",
             });
             socket.close(1008);
             return;
@@ -148,9 +159,30 @@ export function createBackend(options: { publicOrigin?: string } = {}) {
           }
           return;
         }
-        if (!client.session || !store.get(client.session))
-          throw new Error("Sessão inválida ou expirada.");
-        if (message.type === "end") {
+        if (!client.session || !store.get(client.session)) {
+          send(client, {
+            type: "error",
+            code: "SESSION_EXPIRED",
+            message:
+              "Sessão inválida ou expirada. Peça um novo link ao transmissor.",
+          });
+          socket.close(1008);
+          return;
+        }
+        if (message.type === "release-viewer") {
+          if (client.role !== "sender")
+            throw new Error("Somente o transmissor pode liberar o receptor.");
+          const viewer = peer(client);
+          if (viewer) {
+            store.markViewerReleased(client.session, viewer.resumeKey);
+            store.leave(client.session, "viewer", viewer.id);
+            viewer.session = undefined;
+            viewer.role = undefined;
+            send(viewer, { type: "released" });
+            viewer.socket.close(1000, "Released");
+            send(client, { type: "peer-left" });
+          }
+        } else if (message.type === "end") {
           if (client.role !== "sender")
             throw new Error("Somente o transmissor pode encerrar a sessão.");
           const other = peer(client);

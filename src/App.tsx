@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import type { Role, SessionKeys } from "../shared/protocol";
+import type { AccessIssue, Role, SessionKeys } from "../shared/protocol";
 import { RtcSession, type Stats } from "./rtc";
-import { obsLink } from "./links";
+import { obsLink, sessionLocation } from "./links";
+import SessionNotice from "./SessionNotice";
 type Route = { role: Role; id: string; token: string };
 function currentRoute(): Route | null {
-  const match = location.pathname.match(/^\/(send|view)\/([^/]+)$/);
+  const match = location.pathname.match(
+    /^\/(?:status\/(?:busy|expired|released)\/)?(send|view)\/([^/]+)$/,
+  );
   return match
     ? {
         role: match[1] === "send" ? "sender" : "viewer",
@@ -42,6 +45,12 @@ function CameraIcon() {
 export default function App() {
   const [route, setRoute] = useState(currentRoute);
   const [status, setStatus] = useState("Pronto para começar");
+  const [accessIssue, setAccessIssue] = useState<AccessIssue | null>(() => {
+    const match = location.pathname.match(
+      /^\/status\/(busy|expired|released)\//,
+    );
+    return match ? (match[1] as AccessIssue) : null;
+  });
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
@@ -68,6 +77,7 @@ export default function App() {
   );
   const video = useRef<HTMLVideoElement>(null);
   const local = useRef<MediaStream | null>(null);
+  const displayed = useRef<MediaStream | null>(null);
   const call = useRef<RtcSession | null>(null);
   const role = route?.role || "sender";
   const receiver = role === "viewer";
@@ -82,6 +92,7 @@ export default function App() {
         viewToken
       : "";
   function attach(stream: MediaStream | null) {
+    displayed.current = stream;
     const element = video.current;
     if (!element) return;
     setPreviewBlocked(false);
@@ -117,6 +128,48 @@ export default function App() {
     setNotice("Transmissão encerrada.");
     setAudioBlocked(false);
   }
+  function showAccessIssue(issue: AccessIssue | null) {
+    setAccessIssue(issue);
+    history.replaceState(null, "", sessionLocation(location.href, issue));
+    setActive(issue === null);
+    if (issue) {
+      setError("");
+      setNotice("");
+      setStatus(
+        issue === "busy"
+          ? "Aguardando vaga"
+          : issue === "expired"
+            ? "Sessão indisponível"
+            : "Recepção liberada",
+      );
+      if (!receiver) {
+        local.current?.getTracks().forEach((track) => track.stop());
+        local.current = null;
+        attach(null);
+        setPrepared(false);
+      }
+    }
+  }
+  function retryAccess() {
+    call.current?.dispose();
+    call.current = null;
+    if (receiver) connect(null);
+    else {
+      showAccessIssue(null);
+      setActive(false);
+      setStatus("Prepare sua câmera");
+    }
+  }
+  function releaseReception() {
+    call.current?.dispose();
+    call.current = null;
+    showAccessIssue("released");
+  }
+  function handoffToObs() {
+    const link = obsLink(location.href);
+    releaseReception();
+    void copy(link);
+  }
   function connect(stream: MediaStream | null) {
     if (!route) return;
     setError("");
@@ -135,6 +188,7 @@ export default function App() {
         ended: finish,
         config: (c) => setHasTurn(c.hasTurn),
         stats: setStats,
+        access: showAccessIssue,
       },
       relay,
     );
@@ -142,7 +196,7 @@ export default function App() {
     client.connect();
   }
   useEffect(() => {
-    if (route?.role === "viewer") connect(null);
+    if (route?.role === "viewer" && accessIssue !== "released") connect(null);
     return () => {
       call.current?.dispose();
       call.current = null;
@@ -150,9 +204,17 @@ export default function App() {
     };
   }, [route?.id, route?.role]);
   useEffect(() => {
-    document.body.classList.toggle("clean", clean && receiver);
+    document.body.classList.toggle("clean", clean && receiver && !accessIssue);
     return () => document.body.classList.remove("clean");
-  }, [clean, receiver]);
+  }, [clean, receiver, accessIssue]);
+  useEffect(() => {
+    if (
+      !accessIssue &&
+      displayed.current &&
+      video.current?.srcObject !== displayed.current
+    )
+      attach(displayed.current);
+  }, [accessIssue]);
   useEffect(() => {
     const enumerate = () => {
       void navigator.mediaDevices
@@ -312,6 +374,20 @@ export default function App() {
       }
     }
   }
+  if (accessIssue && route)
+    return (
+      <SessionNotice
+        issue={accessIssue}
+        receiver={receiver}
+        status={status}
+        error={error}
+        notice={notice}
+        link={receiver ? obsLink(location.href) : ""}
+        onRetry={retryAccess}
+        onCancel={releaseReception}
+        onCopy={() => copy(obsLink(location.href))}
+      />
+    );
   return (
     <>
       <header className="topbar">
@@ -591,9 +667,17 @@ export default function App() {
                         Copiar link para OBS
                       </button>
                       <p className="small">
-                        Quem tem o link pode assistir. Use em um receptor por
-                        vez.
+                        Compartilhe este link de recepção, não o endereço desta
+                        câmera. Uma vaga para navegador ou OBS.
                       </p>
+                      {active && !ended && (
+                        <button
+                          className="full"
+                          onClick={() => call.current?.releaseViewer()}
+                        >
+                          Liberar receptor
+                        </button>
+                      )}
                     </>
                   ) : (
                     <p>O link aparece depois que você criar a transmissão.</p>
@@ -609,8 +693,14 @@ export default function App() {
                 <button className="full" onClick={() => copy(location.href)}>
                   Copiar endereço atual
                 </button>
+                {!ended && (
+                  <button className="full primary" onClick={handoffToObs}>
+                    Liberar para o OBS
+                  </button>
+                )}
                 <p className="small">
-                  Feche este receptor antes de abrir o mesmo link no OBS.
+                  Libere a vaga deste navegador e copie o link para usar no OBS.
+                  O modo OBS apenas oculta os controles; não libera a vaga.
                 </p>
               </section>
             )}
