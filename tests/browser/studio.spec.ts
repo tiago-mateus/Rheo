@@ -18,6 +18,13 @@ test("operador convida câmera, confere prévia e entrega vídeo horizontal ao O
     page.getByRole("img", { name: "QR code do convite da câmera" }),
   ).toBeVisible();
   const invite = await page.getByLabel("Convite da câmera").inputValue();
+  await page.getByLabel("Priorizar menor atraso").uncheck();
+  expect(
+    new URL(
+      await page.getByLabel("Link para OBS", { exact: true }).inputValue(),
+    ).searchParams.has("latency"),
+  ).toBe(false);
+  await page.getByLabel("Priorizar menor atraso").check();
   const obsLink = await page
     .getByLabel("Link para OBS", { exact: true })
     .inputValue();
@@ -58,10 +65,38 @@ test("operador convida câmera, confere prévia e entrega vídeo horizontal ao O
       .click();
     await expect(page.locator("iframe")).toHaveCount(0);
     const obs = await page.context().newPage();
+    await obs.addInitScript(() => {
+      const descriptor = Object.getOwnPropertyDescriptor(
+        RTCRtpReceiver.prototype,
+        "jitterBufferTarget",
+      );
+      Object.defineProperty(RTCRtpReceiver.prototype, "jitterBufferTarget", {
+        configurable: true,
+        get() {
+          return descriptor?.get?.call(this) ?? null;
+        },
+        set(value: number) {
+          (
+            window as unknown as { rheoBufferTarget?: number }
+          ).rheoBufferTarget = value;
+          descriptor?.set?.call(this, value);
+        },
+      });
+    });
+    expect(new URL(obsLink).searchParams.get("latency")).toBe("low");
     await obs.goto(obsLink);
     await expect(obs.locator("video")).toHaveJSProperty("readyState", 4, {
       timeout: 20000,
     });
+    await expect
+      .poll(() =>
+        obs.evaluate(
+          () =>
+            (window as unknown as { rheoBufferTarget?: number })
+              .rheoBufferTarget,
+        ),
+      )
+      .toBe(80);
     expect(
       await obs
         .locator("video")

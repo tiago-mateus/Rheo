@@ -3,6 +3,7 @@ import QRCode from "qrcode";
 import { defaultFormat, validFormat, type VideoFormat } from "../shared/video";
 import type { SessionKeys } from "../shared/protocol";
 import FormatFields from "./FormatFields";
+import { obsLink } from "./links";
 
 type State = {
   format: VideoFormat;
@@ -25,12 +26,16 @@ export default function Studio() {
   const [busy, setBusy] = useState(false);
   const [expired, setExpired] = useState(false);
   const [preview, setPreview] = useState(false);
+  const [lowLatency, setLowLatency] = useState(true);
   const [qr, setQr] = useState("");
   const invite = state
     ? `${location.origin}/send/${id}#token=${state.sendToken}`
     : "";
   const view = state
-    ? `${location.origin}/view/${id}?clean=1#token=${state.viewToken}`
+    ? obsLink(
+        `${location.origin}/view/${id}#token=${state.viewToken}`,
+        lowLatency,
+      )
     : "";
   useEffect(() => {
     if (!id || !token || expired) return;
@@ -342,6 +347,21 @@ export default function Studio() {
                   value={view}
                   onFocus={(e) => e.target.select()}
                 />
+                <label className="latency-option" htmlFor="low-latency">
+                  <input
+                    id="low-latency"
+                    type="checkbox"
+                    checked={lowLatency}
+                    onChange={(e) => setLowLatency(e.target.checked)}
+                  />
+                  <span>
+                    Priorizar menor atraso{" "}
+                    <small>
+                      Pode engasgar em redes instáveis. Desative e atualize o
+                      link no OBS se acontecer.
+                    </small>
+                  </span>
+                </label>
                 <button className="full" onClick={handoff}>
                   {preview ? "Liberar para o OBS" : "Copiar link para OBS"}
                 </button>

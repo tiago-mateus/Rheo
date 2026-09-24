@@ -46,6 +46,7 @@ export class RtcSession {
     private stream: MediaStream | null,
     private callbacks: Callbacks,
     private relay = false,
+    private lowLatency = false,
   ) {}
   connect() {
     if (this.stopped) return;
@@ -216,6 +217,19 @@ export class RtcSession {
     const remote = new MediaStream();
     pc.ontrack = (event) => {
       if (this.pc !== pc) return;
+      if (this.role === "viewer" && this.lowLatency) {
+        // A preference, not a guarantee: the browser can enlarge the buffer on a noisy network.
+        try {
+          if ("jitterBufferTarget" in event.receiver)
+            event.receiver.jitterBufferTarget = 80;
+          else
+            (
+              event.receiver as RTCRtpReceiver & { playoutDelayHint?: number }
+            ).playoutDelayHint = 0.08;
+        } catch {
+          /* Unsupported receiver hint; keep the browser default. */
+        }
+      }
       if (!remote.getTracks().some((t) => t.id === event.track.id))
         remote.addTrack(event.track);
       this.callbacks.remote(remote);

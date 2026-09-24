@@ -3,6 +3,27 @@
   margin: auto;
   padding: 48px 44px;
 }
+.operator .latency-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  cursor: pointer;
+  line-height: 1.4;
+}
+.latency-option input {
+  width: 20px;
+  height: 20px;
+  min-height: 20px;
+  flex: 0 0 auto;
+  margin: 0;
+  accent-color: var(--accent);
+}
+.latency-option small {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: 4px;
+}
 .media-details {
   margin-top: 20px;
 }

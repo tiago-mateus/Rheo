@@ -105,3 +105,49 @@ test("formatos predefinidos e personalizados cabem no celular", async ({
     await page.evaluate(() => document.documentElement.scrollWidth),
   ).toBeLessThanOrEqual(390);
 });
+
+test("canvas acompanha quadros reais da câmera e para de desenhar ao encerrar", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const counts = await page.evaluate(async () => {
+    const modulePath = "/src/capture.ts";
+    const { frameCamera } = await import(modulePath);
+    const original = CanvasRenderingContext2D.prototype.drawImage;
+    let draws = 0;
+    CanvasRenderingContext2D.prototype.drawImage = function (
+      this: CanvasRenderingContext2D,
+      ...args: unknown[]
+    ) {
+      draws++;
+      return original.apply(this, args as any);
+    } as typeof original;
+    const source = document.createElement("canvas");
+    source.width = 320;
+    source.height = 240;
+    const ctx = source.getContext("2d")!;
+    const raw = source.captureStream(10);
+    const paint = setInterval(() => {
+      ctx.fillStyle = "#f00";
+      ctx.fillRect(0, 0, 320, 240);
+    }, 100);
+    try {
+      const framed = await frameCamera(raw, {
+        width: 640,
+        height: 360,
+        fit: "contain",
+      });
+      await new Promise((r) => setTimeout(r, 700));
+      const active = draws;
+      framed.stop();
+      await new Promise((r) => setTimeout(r, 150));
+      return { active, afterStop: draws };
+    } finally {
+      clearInterval(paint);
+      CanvasRenderingContext2D.prototype.drawImage = original;
+    }
+  });
+  expect(counts.active).toBeGreaterThanOrEqual(2);
+  expect(counts.active).toBeLessThanOrEqual(14);
+  expect(counts.afterStop).toBe(counts.active);
+});

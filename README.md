@@ -16,6 +16,12 @@ O formato é definido ao criar a sala: 720p, 1080p ou dimensões personalizadas 
 
 O enquadramento usa canvas no aparelho que filma, preservando o áudio original. Isso usa processamento/bateria do celular; não melhora os detalhes de uma câmera de resolução inferior. Mantenha a página em primeiro plano. A qualidade efetivamente recebida ainda depende da rede e do encoder do navegador. Para mudar o formato, crie outra sala. Sessões continuam em memória: reiniciar/deployar o servidor invalida os links.
 
+### Menor atraso no OBS
+
+O link para OBS agora prioriza menor atraso. Quando o navegador oferece o controle, o receptor solicita cerca de 80 ms de buffer para áudio/vídeo; a rede ou o navegador podem exigir mais. Se a imagem ou o som engasgarem, desmarque **Priorizar menor atraso** no painel do operador, copie o link atualizado e substitua o endereço da fonte Navegador no OBS. O modo comum deixa o navegador escolher o buffer. A prévia do operador usa o mesmo perfil do link exibido.
+
+No celular, o enquadramento do canvas é redesenhado quando chega um quadro novo da câmera; navegadores mais antigos usam um ciclo limitado a 30 desenhos/s. Isso reduz trabalho redundante, mas não garante um atraso específico. Para avaliar o atraso completo, compare um relógio/cronômetro filmado com o mesmo relógio na saída do OBS; o RTT mostrado no Rheo mede apenas a ida e volta na rede.
+
 MVP local de câmera remota: câmera e microfone → WebRTC → navegador ou OBS. Uma câmera e um receptor por sessão. Interface em português, sem cadastro e sem gravação no servidor.
 
 ## Começar no computador

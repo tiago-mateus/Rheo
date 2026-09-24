@@ -89,6 +89,8 @@ export default function App() {
   const role = route?.role || "sender";
   const receiver = role === "viewer";
   const relay = new URLSearchParams(location.search).get("relay") === "1";
+  const lowLatency =
+    new URLSearchParams(location.search).get("latency") === "low";
   const viewLink =
     route && viewToken
       ? location.origin +
@@ -203,6 +205,7 @@ export default function App() {
         access: showAccessIssue,
       },
       relay,
+      lowLatency,
     );
     call.current = client;
     client.connect();

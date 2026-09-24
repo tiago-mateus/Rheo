@@ -8,7 +8,16 @@ test("link OBS preserva token e parâmetros de conectividade", () => {
   assert.equal(link.pathname, "/view/abc");
   assert.equal(link.searchParams.get("relay"), "1");
   assert.equal(link.searchParams.get("clean"), "1");
+  assert.equal(link.searchParams.get("latency"), "low");
   assert.equal(link.hash, "#token=secret");
+});
+
+test("OBS permite desligar o modo de menor atraso em rede instável", () => {
+  const url = new URL(
+    obsLink("https://rheo.example/view/abc?latency=low#token=secret", false),
+  );
+  assert.equal(url.searchParams.has("latency"), false);
+  assert.equal(url.searchParams.get("clean"), "1");
 });
 
 test("link OBS de uma página de espera remove a rota de status", () => {
