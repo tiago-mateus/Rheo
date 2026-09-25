@@ -644,6 +644,10 @@ export default function App() {
               <summary>Dados da conexão</summary>
               <dl className="telemetry">
                 <div>
+                  <dt>Modo</dt>
+                  <dd>{lanOnly ? "Somente LAN" : "Automático"}</dd>
+                </div>
+                <div>
                   <dt>Conexão</dt>
                   <dd>{stats.route || "—"}</dd>
                 </div>
@@ -675,6 +679,8 @@ export default function App() {
                 rede, não o atraso total do vídeo. “LAN” indica candidatos
                 locais; a rede física usada pode variar com VPN ou roteamento do
                 aparelho.
+                {!lanOnly &&
+                  " Para restringir o vídeo à rede local, crie uma nova sala com Somente LAN."}
               </p>
             </details>
           </section>

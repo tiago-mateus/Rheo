@@ -50,8 +50,13 @@ export function mediaRoute(
   if (!local || !remote) return "Rota não identificada";
   if (local.candidateType === "relay" || remote.candidateType === "relay")
     return "Via TURN";
+  if (
+    lanOnly &&
+    ["host", "prflx"].includes(local.candidateType || "") &&
+    ["host", "prflx"].includes(remote.candidateType || "")
+  )
+    return "LAN";
   if (local.candidateType === "host" && remote.candidateType === "host") {
-    if (lanOnly) return "LAN";
     const localAddress = local.address || local.ip;
     const remoteAddress = remote.address || remote.ip;
     if (isLanAddress(localAddress) && isLanAddress(remoteAddress)) return "LAN";

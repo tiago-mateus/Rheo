@@ -60,4 +60,12 @@ test("indicador só confirma LAN para par host com endereços locais", () => {
     mediaRoute({ candidateType: "host" }, { candidateType: "host" }, true),
     "LAN",
   );
+  assert.equal(
+    mediaRoute({ candidateType: "host" }, { candidateType: "prflx" }, true),
+    "LAN",
+  );
+  assert.equal(
+    mediaRoute({ candidateType: "host" }, { candidateType: "srflx" }, true),
+    "Direta · LAN não confirmada",
+  );
 });

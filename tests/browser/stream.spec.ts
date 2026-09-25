@@ -18,11 +18,14 @@ test("somente LAN propaga links e transmite entre navegadores locais", async ({
   const context = await browser.newContext();
   const receiver = await context.newPage();
   await receiver.goto(link);
+  await expect(
+    receiver.getByText("Somente LAN", { exact: true }).first(),
+  ).toBeVisible();
   await expect(receiver.locator("video")).toHaveJSProperty("readyState", 4, {
     timeout: 20000,
   });
   await expect
-    .poll(() => receiver.locator(".telemetry dd").first().textContent(), {
+    .poll(() => receiver.locator(".telemetry dd").nth(1).textContent(), {
       timeout: 10000,
     })
     .toBe("LAN");
