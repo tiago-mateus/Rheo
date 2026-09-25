@@ -1,4 +1,24 @@
 import { test, expect } from "@playwright/test";
+test("sala somente LAN compartilha a restrição no convite e no OBS", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByLabel("Somente LAN").check();
+  await page.getByRole("button", { name: "Criar sala para OBS" }).click();
+  await expect
+    .poll(() => new URL(page.url()).searchParams.get("lan"))
+    .toBe("1");
+  await expect(page.getByLabel("Convite da câmera")).toHaveValue(
+    /\?lan=1#token=/,
+  );
+  await expect(page.getByLabel("Link para OBS")).toHaveValue(
+    /\?lan=1&clean=1&latency=low#token=/,
+  );
+  await page.reload();
+  await expect(page.getByLabel("Convite da câmera")).toHaveValue(
+    /\?lan=1#token=/,
+  );
+});
 
 test("operador convida câmera, confere prévia e entrega vídeo horizontal ao OBS", async ({
   page,

@@ -31,3 +31,12 @@ test("link OBS de uma página de espera remove a rota de status", () => {
   assert.equal(url.searchParams.get("clean"), "1");
   assert.equal(url.hash, "#token=secret");
 });
+
+test("link OBS preserva modo somente LAN", () => {
+  const url = new URL(
+    obsLink("https://rheo.example/view/abc?lan=1#token=secret"),
+  );
+  assert.equal(url.searchParams.get("lan"), "1");
+  assert.equal(url.searchParams.get("clean"), "1");
+  assert.equal(url.hash, "#token=secret");
+});

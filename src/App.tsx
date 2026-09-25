@@ -82,13 +82,17 @@ export default function App() {
   const [clean, setClean] = useState(
     new URLSearchParams(location.search).get("clean") === "1",
   );
+  const [lanOnly, setLanOnly] = useState(
+    new URLSearchParams(location.search).get("lan") === "1",
+  );
   const video = useRef<HTMLVideoElement>(null);
   const local = useRef<MediaStream | null>(null);
   const displayed = useRef<MediaStream | null>(null);
   const call = useRef<RtcSession | null>(null);
   const role = route?.role || "sender";
   const receiver = role === "viewer";
-  const relay = new URLSearchParams(location.search).get("relay") === "1";
+  const relay =
+    !lanOnly && new URLSearchParams(location.search).get("relay") === "1";
   const lowLatency =
     new URLSearchParams(location.search).get("latency") === "low";
   const viewLink =
@@ -96,7 +100,7 @@ export default function App() {
       ? location.origin +
         "/view/" +
         route.id +
-        (relay ? "?relay=1" : "") +
+        (lanOnly ? "?lan=1" : relay ? "?relay=1" : "") +
         "#token=" +
         viewToken
       : "";
@@ -206,6 +210,7 @@ export default function App() {
       },
       relay,
       lowLatency,
+      lanOnly,
     );
     call.current = client;
     client.connect();
@@ -292,7 +297,11 @@ export default function App() {
       history.pushState(
         null,
         "",
-        "/send/" + keys.id + "#token=" + keys.sendToken,
+        "/send/" +
+          keys.id +
+          (lanOnly ? "?lan=1" : "") +
+          "#token=" +
+          keys.sendToken,
       );
       setRoute({ role: "sender", id: keys.id, token: keys.sendToken });
       setViewToken(keys.viewToken);
@@ -663,7 +672,9 @@ export default function App() {
               </dl>
               <p className="stats-note">
                 Métricas aparecem durante a conexão. RTT mede ida e volta na
-                rede, não o atraso total do vídeo.
+                rede, não o atraso total do vídeo. “LAN” indica candidatos
+                locais; a rede física usada pode variar com VPN ou roteamento do
+                aparelho.
               </p>
             </details>
           </section>
@@ -727,7 +738,25 @@ export default function App() {
                       ))}
                   </select>
                   {!route ? (
-                    <FormatFields value={format} onChange={setFormat} />
+                    <>
+                      <FormatFields value={format} onChange={setFormat} />
+                      <label className="lan-option" htmlFor="lan-only">
+                        <input
+                          id="lan-only"
+                          type="checkbox"
+                          checked={lanOnly}
+                          onChange={(e) => setLanOnly(e.target.checked)}
+                        />
+                        <span>
+                          Somente LAN
+                          <small>
+                            Vídeo apenas entre aparelhos na rede local. Se a
+                            conexão local falhar, não usa a internet como
+                            alternativa.
+                          </small>
+                        </span>
+                      </label>
+                    </>
                   ) : (
                     <div className="quality">
                       <span>Formato de saída</span>
@@ -737,6 +766,9 @@ export default function App() {
                     </div>
                   )}
                   <p className="small">
+                    {lanOnly
+                      ? "Modo somente LAN ativo. O site e a sinalização ainda usam o servidor Render. "
+                      : ""}
                     {format.fit === "contain"
                       ? "Imagem inteira, com barras se necessário."
                       : "Imagem preenchida, com corte nas bordas."}{" "}
@@ -851,11 +883,13 @@ export default function App() {
               <div className="connection-note">
                 <span className="connection-dot" />
                 <p>
-                  {hasTurn === true
-                    ? "TURN disponível para redes que bloqueiam conexões diretas."
-                    : hasTurn === false
-                      ? "Conexão direta. TURN não configurado; algumas redes podem não conectar."
-                      : "Vídeo entre dispositivos, sem gravação no servidor."}
+                  {lanOnly
+                    ? "Vídeo restrito à LAN. Render ainda fornece o site e a sinalização."
+                    : hasTurn === true
+                      ? "TURN disponível para redes que bloqueiam conexões diretas."
+                      : hasTurn === false
+                        ? "Conexão direta. TURN não configurado; algumas redes podem não conectar."
+                        : "Vídeo entre dispositivos, sem gravação no servidor."}
                 </p>
               </div>
             </section>

@@ -22,6 +22,12 @@ O link para OBS agora prioriza menor atraso. Quando o navegador oferece o contro
 
 No celular, o enquadramento do canvas é redesenhado quando chega um quadro novo da câmera; navegadores mais antigos usam um ciclo limitado a 30 desenhos/s. Isso reduz trabalho redundante, mas não garante um atraso específico. Para avaliar o atraso completo, compare um relógio/cronômetro filmado com o mesmo relógio na saída do OBS; o RTT mostrado no Rheo mede apenas a ida e volta na rede.
 
+### Vídeo somente pela LAN
+
+Marque **Somente LAN** antes de criar a sala ou transmissão. O convite da câmera e o link para OBS carregam `?lan=1` automaticamente; use os dois links gerados. Celular e notebook devem estar na mesma rede local e o Wi-Fi não pode isolar clientes. Nesse modo, o WebRTC não usa STUN nem TURN e aceita apenas candidatos de host com endereços privados ou mDNS. Se a rota local falhar, o Rheo mostra um erro em vez de enviar a mídia por um servidor externo. O painel **Dados da conexão** mostra a rota escolhida; fora desse modo, “Direta · LAN não confirmada” não comprova que o vídeo ficou na Wi-Fi.
+
+Ao usar o endereço publicado no Render, **o site, a criação da sala e a sinalização ainda dependem de internet**. A opção restringe apenas o caminho do áudio e vídeo. Para operar completamente offline, rode também o servidor Rheo no notebook e acesse-o por HTTPS local no celular. Redes VPN podem usar endereços privados; desative a VPN para verificar a rota física pela Wi-Fi.
+
 MVP local de câmera remota: câmera e microfone → WebRTC → navegador ou OBS. Uma câmera e um receptor por sessão. Interface em português, sem cadastro e sem gravação no servidor.
 
 ## Começar no computador
@@ -93,7 +99,7 @@ Reinicie o app depois de alterar o ambiente. Para testar TURN de forma forçada,
 - Sinalização: até cinco tentativas automáticas com espera progressiva.
 - Mídia: transmissor tenta renegociar ICE quando a conexão falha.
 - **Reconectar** no receptor reinicia a conexão. No transmissor, libera a captura; prepare e inicie novamente. O estado de microfone silenciado é preservado.
-- Interface mostra bitrate, resolução, FPS, rota direta/TURN e RTT quando fornecidos pelo navegador. **RTT não mede latência total da câmera à tela.**
+- Interface mostra bitrate, resolução, FPS, rota LAN/direta não confirmada/TURN e RTT quando fornecidos pelo navegador. **RTT não mede latência total da câmera à tela.**
 - Qualidade solicitada: 720p/30 fps, respeitando dispositivo e controle de congestionamento do WebRTC.
 
 ## Build e testes

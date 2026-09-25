@@ -27,13 +27,16 @@ export default function Studio() {
   const [expired, setExpired] = useState(false);
   const [preview, setPreview] = useState(false);
   const [lowLatency, setLowLatency] = useState(true);
+  const [lanOnly, setLanOnly] = useState(
+    new URLSearchParams(location.search).get("lan") === "1",
+  );
   const [qr, setQr] = useState("");
   const invite = state
-    ? `${location.origin}/send/${id}#token=${state.sendToken}`
+    ? `${location.origin}/send/${id}${lanOnly ? "?lan=1" : ""}#token=${state.sendToken}`
     : "";
   const view = state
     ? obsLink(
-        `${location.origin}/view/${id}#token=${state.viewToken}`,
+        `${location.origin}/view/${id}${lanOnly ? "?lan=1" : ""}#token=${state.viewToken}`,
         lowLatency,
       )
     : "";
@@ -122,7 +125,7 @@ export default function Studio() {
       history.pushState(
         null,
         "",
-        `/studio/${keys.id}#token=${keys.controlToken}`,
+        `/studio/${keys.id}${lanOnly ? "?lan=1" : ""}#token=${keys.controlToken}`,
       );
       setState({
         ...keys,
@@ -214,6 +217,22 @@ export default function Studio() {
               <form className="room-setup" onSubmit={create}>
                 <h2>Como a imagem deve chegar?</h2>
                 <FormatFields value={format} onChange={setFormat} />
+                <label className="lan-option" htmlFor="studio-lan-only">
+                  <input
+                    id="studio-lan-only"
+                    type="checkbox"
+                    checked={lanOnly}
+                    onChange={(e) => setLanOnly(e.target.checked)}
+                  />
+                  <span>
+                    Somente LAN
+                    <small>
+                      Use celular e notebook na mesma rede Wi-Fi. O vídeo não
+                      terá rota de internet como alternativa; o site e a
+                      sinalização continuam no Render.
+                    </small>
+                  </span>
+                </label>
                 {error && (
                   <p className="error" role="alert">
                     {error}
@@ -272,6 +291,7 @@ export default function Studio() {
               <span className="room-format">
                 {format.width} × {format.height} · 30 fps
                 <br />
+                {lanOnly ? "Somente LAN · " : ""}
                 {format.fit === "contain"
                   ? "Imagem inteira"
                   : "Preencher com corte"}

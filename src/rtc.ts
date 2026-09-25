@@ -4,6 +4,7 @@ import type {
   Role,
   Signal,
 } from "../shared/protocol";
+import { isLanCandidate, lanDescription, mediaRoute } from "./network";
 export interface Stats {
   bitrate?: number;
   fps?: number;
@@ -32,6 +33,7 @@ export class RtcSession {
   private reconnectTimer?: ReturnType<typeof setTimeout>;
   private iceTimer?: ReturnType<typeof setTimeout>;
   private statsTimer?: ReturnType<typeof setInterval>;
+  private lanTimer?: ReturnType<typeof setTimeout>;
   private config?: IceSettings;
   private pending: RTCIceCandidateInit[] = [];
   private resumeKey = Array.from(
@@ -47,6 +49,7 @@ export class RtcSession {
     private callbacks: Callbacks,
     private relay = false,
     private lowLatency = false,
+    private lanOnly = false,
   ) {}
   connect() {
     if (this.stopped) return;
@@ -144,26 +147,37 @@ export class RtcSession {
         if (this.pc === pc)
           this.send({
             type: "description",
-            description: pc.localDescription!.toJSON(),
+            description: this.lanOnly
+              ? lanDescription(pc.localDescription!.toJSON())
+              : pc.localDescription!.toJSON(),
           });
       }
     } else if (message.type === "description") {
       const pc = this.pc || this.createPeer();
-      await pc.setRemoteDescription(message.description);
+      await pc.setRemoteDescription(
+        this.lanOnly
+          ? lanDescription(message.description)
+          : message.description,
+      );
       for (const candidate of this.pending.splice(0))
-        await pc.addIceCandidate(candidate);
+        if (!this.lanOnly || isLanCandidate(candidate.candidate || ""))
+          await pc.addIceCandidate(candidate);
       if (this.role === "viewer") {
         await pc.setLocalDescription(await pc.createAnswer());
         if (this.pc === pc)
           this.send({
             type: "description",
-            description: pc.localDescription!.toJSON(),
+            description: this.lanOnly
+              ? lanDescription(pc.localDescription!.toJSON())
+              : pc.localDescription!.toJSON(),
           });
       }
     } else if (message.type === "candidate") {
-      if (this.pc?.remoteDescription)
-        await this.pc.addIceCandidate(message.candidate);
-      else this.pending.push(message.candidate);
+      if (!this.lanOnly || isLanCandidate(message.candidate.candidate || "")) {
+        if (this.pc?.remoteDescription)
+          await this.pc.addIceCandidate(message.candidate);
+        else this.pending.push(message.candidate);
+      }
     } else if (message.type === "peer-left") {
       this.closePeer();
       this.callbacks.status(
@@ -203,15 +217,26 @@ export class RtcSession {
     this.closePeer();
     this.iceAttempts = 0;
     const pc = new RTCPeerConnection({
-      iceServers: this.config?.iceServers,
+      iceServers: this.lanOnly ? [] : this.config?.iceServers,
       iceTransportPolicy: this.relay ? "relay" : "all",
     });
     this.pc = pc;
+    if (this.lanOnly)
+      this.lanTimer = setTimeout(() => {
+        if (this.pc === pc && pc.connectionState !== "connected")
+          this.callbacks.error(
+            "Não foi possível conectar pela LAN. Confira se celular e notebook estão na mesma rede Wi-Fi e desative o isolamento de clientes do roteador.",
+          );
+      }, 15000);
     if (this.stream)
       for (const track of this.stream.getTracks())
         pc.addTrack(track, this.stream);
     pc.onicecandidate = (event) => {
-      if (event.candidate && this.pc === pc)
+      if (
+        event.candidate &&
+        this.pc === pc &&
+        (!this.lanOnly || isLanCandidate(event.candidate.candidate))
+      )
         this.send({ type: "candidate", candidate: event.candidate.toJSON() });
     };
     const remote = new MediaStream();
@@ -237,6 +262,7 @@ export class RtcSession {
     pc.onconnectionstatechange = () => {
       if (this.pc !== pc) return;
       if (pc.connectionState === "connected") {
+        clearTimeout(this.lanTimer);
         clearTimeout(this.iceTimer);
         this.iceAttempts = 0;
         this.callbacks.error("");
@@ -265,7 +291,9 @@ export class RtcSession {
     if (this.role !== "sender") return; // The sender is the sole offerer.
     if (this.iceAttempts++ >= 2) {
       this.callbacks.error(
-        "A mídia não reconectou. Confira a rede ou a configuração TURN e clique em Reconectar.",
+        this.lanOnly
+          ? "Não foi possível conectar pela LAN. Confira se os aparelhos estão na mesma rede Wi-Fi e se o roteador permite comunicação entre eles."
+          : "A mídia não reconectou. Confira a rede ou a configuração TURN e clique em Reconectar.",
       );
       return;
     }
@@ -277,7 +305,9 @@ export class RtcSession {
         if (this.pc === pc)
           this.send({
             type: "description",
-            description: pc.localDescription!.toJSON(),
+            description: this.lanOnly
+              ? lanDescription(pc.localDescription!.toJSON())
+              : pc.localDescription!.toJSON(),
           });
       }
       this.iceTimer = setTimeout(() => {
@@ -321,11 +351,7 @@ export class RtcSession {
             result.rtt = Math.round(pair.currentRoundTripTime * 1000);
           const local = stats.get(pair?.localCandidateId);
           const remote = stats.get(pair?.remoteCandidateId);
-          result.route =
-            local?.candidateType === "relay" ||
-            remote?.candidateType === "relay"
-              ? "Via TURN"
-              : "Direta";
+          result.route = mediaRoute(local, remote, this.lanOnly);
         }
       });
       this.callbacks.stats(result);
@@ -336,6 +362,7 @@ export class RtcSession {
   private closePeer() {
     clearInterval(this.statsTimer);
     clearTimeout(this.iceTimer);
+    clearTimeout(this.lanTimer);
     if (this.pc) {
       this.pc.onconnectionstatechange = null;
       this.pc.ontrack = null;

@@ -1,4 +1,33 @@
 import { test, expect } from "@playwright/test";
+test("somente LAN propaga links e transmite entre navegadores locais", async ({
+  browser,
+  page,
+}) => {
+  await page.goto("/?camera=1");
+  await page.getByLabel("Somente LAN").check();
+  await page.getByRole("button", { name: "Criar transmissão" }).click();
+  await expect
+    .poll(() => new URL(page.url()).searchParams.get("lan"))
+    .toBe("1");
+  await page.getByRole("button", { name: "Preparar câmera" }).click();
+  await page
+    .getByRole("button", { name: "Iniciar transmissão", exact: true })
+    .click();
+  const link = await page.getByLabel("Link de recepção").inputValue();
+  expect(new URL(link).searchParams.get("lan")).toBe("1");
+  const context = await browser.newContext();
+  const receiver = await context.newPage();
+  await receiver.goto(link);
+  await expect(receiver.locator("video")).toHaveJSProperty("readyState", 4, {
+    timeout: 20000,
+  });
+  await expect
+    .poll(() => receiver.locator(".telemetry dd").first().textContent(), {
+      timeout: 10000,
+    })
+    .toBe("LAN");
+  await context.close();
+});
 test("câmera transmite, receptor recarrega, modo OBS e captura encerra", async ({
   browser,
   page,

@@ -333,6 +333,30 @@ select {
   font-size: 11px;
   line-height: 1.6;
 }
+.lan-option {
+  display: flex !important;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 18px 0 !important;
+  cursor: pointer;
+}
+.lan-option input {
+  width: 18px;
+  min-height: 18px;
+  margin: 2px 0 0;
+  flex: none;
+}
+.lan-option span {
+  display: block;
+  color: #eef3ef;
+  font-size: 13px;
+}
+.lan-option small {
+  display: block;
+  color: var(--muted);
+  line-height: 1.5;
+  margin-top: 4px;
+}
 .link-field {
   display: flex;
   flex-direction: column;
