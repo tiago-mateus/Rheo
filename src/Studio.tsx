@@ -5,6 +5,7 @@ import type { SessionKeys } from "../shared/protocol";
 import FormatFields from "./FormatFields";
 import { obsLink } from "./links";
 import { readStudioKey, saveStudioKey } from "./studioAuth";
+import { cameraQualityQuery, type ImageQuality } from "./imageQuality";
 
 type State = {
   format: VideoFormat;
@@ -28,13 +29,14 @@ export default function Studio() {
   const [busy, setBusy] = useState(false);
   const [expired, setExpired] = useState(false);
   const [preview, setPreview] = useState(false);
-  const [lowLatency, setLowLatency] = useState(true);
+  const [lowLatency, setLowLatency] = useState(false);
+  const [imageQuality, setImageQuality] = useState<ImageQuality>("maximum");
   const [lanOnly, setLanOnly] = useState(
     new URLSearchParams(location.search).get("lan") === "1",
   );
   const [qr, setQr] = useState("");
   const invite = state
-    ? `${location.origin}/send/${id}${lanOnly ? "?lan=1" : ""}#token=${state.sendToken}`
+    ? `${location.origin}/send/${id}${cameraQualityQuery(imageQuality, lanOnly)}#token=${state.sendToken}`
     : "";
   const view = state
     ? obsLink(
@@ -222,6 +224,10 @@ export default function Studio() {
                 <label htmlFor="studio-key">Chave do operador (quando configurada)</label>
                 <input id="studio-key" type="password" autoComplete="off" value={studioKey} onChange={(e) => setStudioKey(e.target.value)} placeholder="Chave definida no servidor" />
                 <FormatFields value={format} onChange={setFormat} />
+                <label className="lan-option" htmlFor="studio-image-quality">
+                  <input id="studio-image-quality" type="checkbox" checked={imageQuality === "maximum"} onChange={(e) => setImageQuality(e.target.checked ? "maximum" : "balanced")} />
+                  <span>Priorizar qualidade máxima<small>Maior bitrate, preservação de resolução e 30 FPS. Desative para usar menos rede em celulares e conexões limitados.</small></span>
+                </label>
                 <label className="lan-option" htmlFor="studio-lan-only">
                   <input
                     id="studio-lan-only"
@@ -296,6 +302,8 @@ export default function Studio() {
               </div>
               <span className="room-format">
                 {format.width} × {format.height} · 30 fps
+                <br />
+                {imageQuality === "maximum" ? "Qualidade máxima" : "Modo equilibrado"}
                 <br />
                 {lanOnly ? "Somente LAN · " : ""}
                 {format.fit === "contain"
