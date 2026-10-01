@@ -5,7 +5,7 @@ import type { SessionKeys } from "../shared/protocol";
 import FormatFields from "./FormatFields";
 import { obsLink } from "./links";
 import { readStudioKey, saveStudioKey } from "./studioAuth";
-import { cameraQualityQuery, type ImageQuality } from "./imageQuality";
+import { cameraQualityQuery, imageQualityFromSearch, type ImageQuality } from "./imageQuality";
 
 type State = {
   format: VideoFormat;
@@ -30,7 +30,7 @@ export default function Studio() {
   const [expired, setExpired] = useState(false);
   const [preview, setPreview] = useState(false);
   const [lowLatency, setLowLatency] = useState(false);
-  const [imageQuality, setImageQuality] = useState<ImageQuality>("maximum");
+  const [imageQuality, setImageQuality] = useState<ImageQuality>(() => imageQualityFromSearch(location.search));
   const [lanOnly, setLanOnly] = useState(
     new URLSearchParams(location.search).get("lan") === "1",
   );
@@ -130,7 +130,7 @@ export default function Studio() {
       history.pushState(
         null,
         "",
-        `/studio/${keys.id}${lanOnly ? "?lan=1" : ""}#token=${keys.controlToken}`,
+        `/studio/${keys.id}${cameraQualityQuery(imageQuality, lanOnly)}#token=${keys.controlToken}`,
       );
       setState({
         ...keys,
@@ -226,7 +226,7 @@ export default function Studio() {
                 <FormatFields value={format} onChange={setFormat} />
                 <label className="lan-option" htmlFor="studio-image-quality">
                   <input id="studio-image-quality" type="checkbox" checked={imageQuality === "maximum"} onChange={(e) => setImageQuality(e.target.checked ? "maximum" : "balanced")} />
-                  <span>Priorizar qualidade máxima<small>Maior bitrate, preservação de resolução e 30 FPS. Desative para usar menos rede em celulares e conexões limitados.</small></span>
+                  <span>Priorizar qualidade máxima<small>Mais bitrate e mais detalhes, mesmo que a fluidez diminua em redes lentas. Desative para economizar dados.</small></span>
                 </label>
                 <label className="lan-option" htmlFor="studio-lan-only">
                   <input
