@@ -104,7 +104,8 @@ export default function MultiStudio() {
       if (!response.ok) throw new Error(data.error || "Não foi possível criar a sala.");
       saveStudioKey(studioKey);
       const keys = data as SessionKeys;
-      const next = [...rooms, { ...keys, name: names[rooms.length], format: { ...format }, lanOnly }];
+      const name = names.find((candidate) => !rooms.some((room) => room.name === candidate)) || names[rooms.length];
+      const next = [...rooms, { ...keys, name, format: { ...format }, lanOnly }];
       save(next);
       setNotice("Sala criada. Compartilhe o convite da câmera e adicione a fonte no OBS.");
     } catch (e) {
@@ -152,7 +153,7 @@ export default function MultiStudio() {
         {notice && <p className="notice" role="status">{notice}</p>}
         {rooms.length < 3 && (
           <form className="room-setup multi-setup" onSubmit={create}>
-            <h2>Adicionar {names[rooms.length]}</h2>
+            <h2>Adicionar {names.find((candidate) => !rooms.some((room) => room.name === candidate)) || names[rooms.length]}</h2>
             <label htmlFor="multi-key">Chave do operador (obrigatória em produção)</label>
             <input id="multi-key" type="password" autoComplete="off" value={studioKey}
               onChange={(e) => setStudioKey(e.target.value)} placeholder="Chave definida no servidor" />
