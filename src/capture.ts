@@ -1,6 +1,16 @@
 import { frameRect, type VideoFormat } from "../shared/video";
 
 export async function frameCamera(raw: MediaStream, format: VideoFormat) {
+  // Avoid a canvas and an extra captured stream when the source already has
+  // exactly the requested geometry. Keep the canvas path for crop/letterbox.
+  const track = raw.getVideoTracks()[0];
+  const settings = track?.getSettings();
+  if (settings?.width === format.width && settings?.height === format.height) {
+    return {
+      stream: raw,
+      stop: () => raw.getTracks().forEach((t) => t.stop()),
+    };
+  }
   const source = document.createElement("video");
   source.muted = true;
   source.defaultMuted = true;

@@ -388,6 +388,7 @@ export class RtcSession {
     clearTimeout(this.reconnectTimer);
     this.closePeer();
     this.socket?.close();
-    this.stream?.getTracks().forEach((t) => t.stop());
+    // The capture owner (App / frameCamera) manages media-track lifetime.
+    // Disposing a peer must never turn off the camera during reconnection.
   }
 }
