@@ -16,6 +16,12 @@ O formato é definido ao criar a sala: 720p, 1080p ou dimensões personalizadas 
 
 O enquadramento usa canvas no aparelho que filma, preservando o áudio original. Isso usa processamento/bateria do celular; não melhora os detalhes de uma câmera de resolução inferior. Mantenha a página em primeiro plano. A qualidade efetivamente recebida ainda depende da rede e do encoder do navegador. Para mudar o formato, crie outra sala. Sessões continuam em memória: reiniciar/deployar o servidor invalida os links.
 
+### Controle de bitrate do transmissor
+
+O Rheo solicita ao navegador um limite máximo de bitrate de vídeo conforme a resolução capturada: 1.200 kbps para resoluções pequenas, 2.500 kbps até 720p e 4.500 kbps acima de 720p. São limites máximos, não velocidades garantidas; a rede e o controle de congestionamento do WebRTC podem escolher valores menores.
+
+Para testar outro limite, adicione `bitrate=1800` ao **convite da câmera** (kbps, entre 300 e 8000), antes do fragmento `#token=...`. Exemplo: `/send/ID?bitrate=1800#token=TOKEN`. Se já existir `?lan=1`, use `?lan=1&bitrate=1800`. O ajuste depende do suporte do navegador a `RTCRtpSender.setParameters()`; se não for suportado, o Rheo usa a configuração automática padrão. A alteração afeta apenas a câmera que abrir o convite modificado.
+
 ### Menor atraso no OBS
 
 O link para OBS agora prioriza menor atraso. Quando o navegador oferece o controle, o receptor solicita cerca de 80 ms de buffer para áudio/vídeo; a rede ou o navegador podem exigir mais. Se a imagem ou o som engasgarem, desmarque **Priorizar menor atraso** no painel do operador, copie o link atualizado e substitua o endereço da fonte Navegador no OBS. O modo comum deixa o navegador escolher o buffer. A prévia do operador usa o mesmo perfil do link exibido.
