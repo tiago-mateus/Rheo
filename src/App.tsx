@@ -592,7 +592,7 @@ export default function App() {
               </span>
               <div className="transport-actions">
                 {!route && (
-                  <label htmlFor="standalone-studio-key">Chave do operador <input id="standalone-studio-key" type="password" autoComplete="off" value={studioKey} onChange={(e) => setStudioKey(e.target.value)} placeholder="Obrigatória em produção" /></label>
+                  <label htmlFor="standalone-studio-key">Chave do operador <input id="standalone-studio-key" type="password" autoComplete="off" value={studioKey} onChange={(e) => setStudioKey(e.target.value)} placeholder="Se configurada no servidor" /></label>
                 )}
                 {!route && (
                   <button className="primary" disabled={busy} onClick={create}>
