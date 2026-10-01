@@ -20,7 +20,7 @@ export function videoBitrateKbps(
     ? pixels > 1280 * 720 ? 12000 : pixels > 640 * 480 ? 6000 : 3000
     : pixels > 1280 * 720 ? 4500 : pixels > 640 * 480 ? 2500 : 1200;
   const requested = new URLSearchParams(search).get("bitrate");
-  if (requested === null || !/^\\d+$/.test(requested)) return automatic;
+  if (requested === null || !/^\d+$/.test(requested)) return automatic;
   const kbps = Number(requested);
   return Number.isSafeInteger(kbps) && kbps >= 300 && kbps <= 16000
     ? kbps
