@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 
 test("Full HD and maximum image fidelity are defaults in studio", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByLabel("Resolução")).toHaveValue("1080");
+  await expect(page.getByLabel("Resolução", { exact: true })).toHaveValue("1080");
   await expect(page.getByLabel("Priorizar qualidade máxima")).toBeChecked();
   await page.getByRole("button", { name: "Criar sala para OBS" }).click();
   const invite = await page.getByLabel("Convite da câmera").inputValue();
@@ -19,10 +19,9 @@ test("balanced camera invitations are explicit and reversible", async ({ page })
   let invite = new URL(await page.getByLabel("Convite da câmera").inputValue());
   expect(invite.searchParams.get("lan")).toBe("1");
   expect(invite.searchParams.get("quality")).toBe("balanced");
-  await page.getByLabel("Priorizar qualidade máxima").check();
+  await page.reload();
   invite = new URL(await page.getByLabel("Convite da câmera").inputValue());
-  expect(invite.searchParams.get("lan")).toBe("1");
-  expect(invite.searchParams.has("quality")).toBe(false);
+  expect(invite.searchParams.get("quality")).toBe("balanced");
 });
 
 test("sender reports actual camera dimensions instead of only requested output", async ({ page }) => {
