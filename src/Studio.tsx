@@ -219,7 +219,7 @@ export default function Studio() {
             <div className="setup-layout">
               <form className="room-setup" onSubmit={create}>
                 <h2>Como a imagem deve chegar?</h2>
-                <label htmlFor="studio-key">Chave do operador (obrigatória em produção)</label>
+                <label htmlFor="studio-key">Chave do operador (quando configurada)</label>
                 <input id="studio-key" type="password" autoComplete="off" value={studioKey} onChange={(e) => setStudioKey(e.target.value)} placeholder="Chave definida no servidor" />
                 <FormatFields value={format} onChange={setFormat} />
                 <label className="lan-option" htmlFor="studio-lan-only">
