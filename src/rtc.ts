@@ -213,6 +213,31 @@ export class RtcSession {
       this.callbacks.error(message.message);
     }
   }
+  private async applyVideoBitrate(sender: RTCRtpSender) {
+    try {
+      const track = sender.track;
+      if (!track) return;
+      const settings = track.getSettings();
+      const pixels = (settings.width || 1280) * (settings.height || 720);
+      const defaultKbps = pixels > 1280 * 720 ? 4500 : pixels > 640 * 480 ? 2500 : 1200;
+      // Optional URL override for a camera invitation: ?bitrate=1800 (kbps).
+      // Bounds protect against unusably low or unexpectedly high values.
+      const requested = new URLSearchParams(location.search).get("bitrate");
+      const parsed = requested === null ? NaN : Number(requested);
+      const kbps = Number.isFinite(parsed) && parsed >= 300 && parsed <= 8000
+        ? parsed
+        : defaultKbps;
+      const parameters = sender.getParameters();
+      if (!parameters.encodings?.length) return;
+      parameters.encodings = parameters.encodings.map((encoding) => ({
+        ...encoding,
+        maxBitrate: Math.round(kbps * 1000),
+      }));
+      await sender.setParameters(parameters);
+    } catch {
+      // Some browsers reject encoder preferences. Keep WebRTC functioning.
+    }
+  }
   private createPeer() {
     this.closePeer();
     this.iceAttempts = 0;
@@ -229,8 +254,14 @@ export class RtcSession {
           );
       }, 15000);
     if (this.stream)
-      for (const track of this.stream.getTracks())
-        pc.addTrack(track, this.stream);
+      for (const track of this.stream.getTracks()) {
+        const sender = pc.addTrack(track, this.stream);
+        if (track.kind === "video") {
+          // A bitrate cap is an upper bound, not a guaranteed network rate.
+          // Unsupported browsers should continue with their default encoder.
+          void this.applyVideoBitrate(sender);
+        }
+      }
     pc.onicecandidate = (event) => {
       if (
         event.candidate &&
