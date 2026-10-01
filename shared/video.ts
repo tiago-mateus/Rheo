@@ -4,8 +4,8 @@ export interface VideoFormat {
   fit: "contain" | "cover";
 }
 export const defaultFormat: VideoFormat = {
-  width: 1280,
-  height: 720,
+  width: 1920,
+  height: 1080,
   fit: "contain",
 };
 export function validFormat(value: unknown): value is VideoFormat {
