@@ -7,6 +7,10 @@ services:
     startCommand: npm start
     healthCheckPath: /api/health
     envVars:
+      - key: RHEO_STUDIO_KEY
+        sync: false
+      - key: RHEO_TRUST_PROXY
+        value: "1"
       - key: NODE_VERSION
         value: "24"
       - key: NODE_ENV
