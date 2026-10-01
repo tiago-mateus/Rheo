@@ -24,21 +24,19 @@ O formato é definido ao criar a sala: 720p, 1080p ou dimensões personalizadas 
 
 O enquadramento usa canvas no aparelho que filma, preservando o áudio original. Isso usa processamento/bateria do celular; não melhora os detalhes de uma câmera de resolução inferior. Mantenha a página em primeiro plano. A qualidade efetivamente recebida ainda depende da rede e do encoder do navegador. Para mudar o formato, crie outra sala. Sem arquivo persistente configurado, reiniciar/deployar o servidor invalida os links.
 
-### Controle de bitrate do transmissor
+### Qualidade de imagem: preferência por detalhes
 
-O Rheo solicita ao navegador um limite máximo de bitrate de vídeo conforme a resolução capturada: 1.200 kbps para resoluções pequenas, 2.500 kbps até 720p e 4.500 kbps acima de 720p. São limites máximos, não velocidades garantidas; a rede e o controle de congestionamento do WebRTC podem escolher valores menores.
+O padrão para novas salas é **1920 × 1080 / 30 FPS**, com o perfil **Priorizar qualidade máxima** ativo. Este perfil solicita limites de até 3 Mbps para resoluções pequenas, 6 Mbps até 720p e **12 Mbps para Full HD**, com preferência por preservar a resolução quando a rede está congestionada. O navegador continua controlando o bitrate efetivo: limites máximos não garantem taxa nem nitidez. A transmissão pode ter FPS menor sob carga, especialmente em celular aquecendo ou rede insuficiente. O modo equilibrado usa os tetos anteriores (1,2 / 2,5 / 4,5 Mbps). Escolha o perfil ao gerar o convite no painel individual ou em `/multi`.
 
-Para testar outro limite, adicione `bitrate=1800` ao **convite da câmera** (kbps, entre 300 e 8000), antes do fragmento `#token=...`. Exemplo: `/send/ID?bitrate=1800#token=TOKEN`. Se já existir `?lan=1`, use `?lan=1&bitrate=1800`. O ajuste depende do suporte do navegador a `RTCRtpSender.setParameters()`; se não for suportado, o Rheo usa a configuração automática padrão. A alteração afeta apenas a câmera que abrir o convite modificado.
+A captura solicita `resizeMode: none` quando o navegador oferece essa configuração, para evitar uma redução ou ampliação de resolução ocultas. O painel da câmera mostra a **resolução real capturada** por `getSettings()`, que pode diferir da resolução de saída. Se a câmera fornecer menos pixels que a saída, o Rheo informa que o enquadramento não consegue inventar detalhes. O caminho direto sem Canvas é mantido sempre que a geometria de captura corresponde à saída. No receptor, o painel Dados da conexão inclui codec negociado, bitrate efetivo e quadros descartados quando disponíveis.
 
-### Controle de bitrate do transmissor
+Para testar um teto diferente, acrescente `bitrate=16000` ao convite da câmera (em kbps, valores de **300 a 16000**), antes do fragmento `#token=...`. Exemplo: `/send/ID?bitrate=16000#token=TOKEN` ou `/send/ID?lan=1&bitrate=16000#token=TOKEN`. Em dispositivos sem suporte a `RTCRtpSender.setParameters()`, o encoder aplica as próprias escolhas.
 
-O Rheo solicita ao navegador um limite máximo de bitrate de vídeo conforme a resolução capturada: 1.200 kbps para resoluções pequenas, 2.500 kbps até 720p e 4.500 kbps acima de 720p. São limites máximos, não velocidades garantidas; a rede e o controle de congestionamento do WebRTC podem escolher valores menores.
-
-Para testar outro limite, adicione `bitrate=1800` ao **convite da câmera** (kbps, entre 300 e 8000), antes do fragmento `#token=...`. Exemplo: `/send/ID?bitrate=1800#token=TOKEN`. Se já existir `?lan=1`, use `?lan=1&bitrate=1800`. O ajuste depende do suporte do navegador a `RTCRtpSender.setParameters()`; se não for suportado, o Rheo usa a configuração automática padrão. A alteração afeta apenas a câmera que abrir o convite modificado.
+**Atenção:** a qualidade de imagem do aplicativo nativo de câmera não é garantida no navegador, pois processamento HDR, redução de ruído, estabilização e outras funções variam por modelo/navegador. Não confunda teto de bitrate solicitado, resolução de saída e resolução que a câmera realmente entrega.
 
 ### Menor atraso no OBS
 
-O link para OBS agora prioriza menor atraso. Quando o navegador oferece o controle, o receptor solicita cerca de 80 ms de buffer para áudio/vídeo; a rede ou o navegador podem exigir mais. Se a imagem ou o som engasgarem, desmarque **Priorizar menor atraso** no painel do operador, copie o link atualizado e substitua o endereço da fonte Navegador no OBS. O modo comum deixa o navegador escolher o buffer. A prévia do operador usa o mesmo perfil do link exibido.
+O link do OBS agora utiliza o buffer padrão do navegador por padrão, em favor da estabilidade visual. Se ativar **Priorizar menor atraso** no painel, o receptor pode solicitar cerca de 80 ms de buffer quando o navegador oferece esse controle; a rede ou o navegador podem exigir mais. Se a imagem ou o som engasgarem, desmarque **Priorizar menor atraso** no painel do operador, copie o link atualizado e substitua o endereço da fonte Navegador no OBS. O modo comum deixa o navegador escolher o buffer. A prévia do operador usa o mesmo perfil do link exibido.
 
 No celular, o enquadramento do canvas é redesenhado quando chega um quadro novo da câmera; navegadores mais antigos usam um ciclo limitado a 30 desenhos/s. Isso reduz trabalho redundante, mas não garante um atraso específico. Para avaliar o atraso completo, compare um relógio/cronômetro filmado com o mesmo relógio na saída do OBS; o RTT mostrado no Rheo mede apenas a ida e volta na rede.
 
@@ -92,7 +90,7 @@ No transmissor, clique em **Copiar link para OBS**. No OBS:
 
 1. Adicione uma fonte **Navegador**.
 2. Cole o link completo, incluindo `#token=...`.
-3. Use largura **1280**, altura **720**.
+3. Use a largura e altura indicadas no painel (por padrão **1920 × 1080**).
 4. Confira o áudio no mixer; se desejar, habilite **Controlar áudio através do OBS** nas propriedades da fonte.
 
 O modo OBS ocupa a tela com o vídeo. O botão **Mostrar controles** aparece ao passar o mouse no canto inferior direito ou ao focar com Tab. Se o navegador bloquear áudio, aparece **Ativar áudio**. O comportamento de autoplay depende da versão do navegador/OBS e precisa de teste no seu OBS.
@@ -120,7 +118,7 @@ Reinicie o app depois de alterar o ambiente. Para testar TURN de forma forçada,
 - Mídia: transmissor tenta renegociar ICE quando a conexão falha.
 - **Reconectar** no receptor reinicia a conexão. No transmissor, libera a captura; prepare e inicie novamente. O estado de microfone silenciado é preservado.
 - Interface mostra bitrate, resolução, FPS, rota LAN/direta não confirmada/TURN e RTT quando fornecidos pelo navegador. **RTT não mede latência total da câmera à tela.**
-- Qualidade solicitada: 720p/30 fps, respeitando dispositivo e controle de congestionamento do WebRTC.
+- Qualidade solicitada por padrão: 1080p/30 fps, respeitando dispositivo e controle de congestionamento do WebRTC.
 
 ## Build e testes
 
@@ -154,7 +152,7 @@ Porta alternativa no PowerShell: `$env:PORT=3001`, depois inicie o comando escol
 
 ## Limites da versão
 
-MVP de teste local, não um serviço público endurecido. Não inclui multicâmera, SFU, contas, gravação, medição automática de latência ponta a ponta ou suporte garantido a todos os navegadores. Chrome/Edge são os alvos iniciais. WebRTC e câmeras sintéticas são testados em Chromium; câmera física, estabilidade de 20 minutos, rede móvel, retransmissão TURN real e OBS precisam ser validados no seu ambiente.
+MVP de teste local, não um serviço público endurecido. Inclui painel para três salas independentes, mas não inclui SFU, contas, gravação, medição automática de latência ponta a ponta ou suporte garantido a todos os navegadores. Chrome/Edge são os alvos iniciais. WebRTC e câmeras sintéticas são testados em Chromium; câmera física, estabilidade de 20 minutos, rede móvel, retransmissão TURN real e OBS precisam ser validados no seu ambiente.
 
 ## Publicação no Render
 
