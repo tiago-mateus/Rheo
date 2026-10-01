@@ -82,7 +82,12 @@ export class SessionStore {
       releasedViewers: new Set<string>(),
     };
     this.sessions.set(session.id, session);
-    this.persist();
+    try {
+      this.persist();
+    } catch (error) {
+      this.sessions.delete(session.id);
+      throw error;
+    }
     return {
       id: session.id,
       sendToken: session.sendToken,
@@ -134,7 +139,15 @@ export class SessionStore {
     return this.get(id)?.releasedViewers.has(resumeKey) ?? false;
   }
   end(id: string) {
-    if (this.sessions.delete(id)) this.persist();
+    const previous = this.sessions.get(id);
+    if (!previous) return;
+    this.sessions.delete(id);
+    try {
+      this.persist();
+    } catch (error) {
+      this.sessions.set(id, previous);
+      throw error;
+    }
   }
   sweep() {
     for (const id of this.sessions.keys()) this.get(id);
