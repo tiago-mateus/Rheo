@@ -35,8 +35,10 @@ export function createBackend(options: { publicOrigin?: string; studioKey?: stri
   if (studioKey && studioKey.length < 24)
     throw new Error("RHEO_STUDIO_KEY deve ter no mínimo 24 caracteres.");
   const store = new SessionStore(Date.now, 4 * 60 * 60 * 1000, options.persistencePath ?? process.env.RHEO_SESSION_FILE);
+  if (!studioKey && process.env.NODE_ENV === "production")
+    console.warn("Rheo: RHEO_STUDIO_KEY ausente; criação de salas permanece pública. Configure a chave no Render.");
   const authorizedCreator = (supplied: unknown) => {
-    if (!studioKey) return process.env.NODE_ENV !== "production";
+    if (!studioKey) return true;
     if (typeof supplied !== "string" || supplied.length > 1024) return false;
     const expected = createHash("sha256").update(studioKey).digest();
     const actual = createHash("sha256").update(supplied).digest();
@@ -63,8 +65,7 @@ export function createBackend(options: { publicOrigin?: string; studioKey?: stri
   app.use(express.json({ limit: "4kb" }));
   app.post("/api/sessions", (req, res) => {
     if (!authorizedCreator(req.headers["x-rheo-studio-key"])) {
-      res.status(studioKey ? 401 : 503).json({ error: studioKey
-        ? "Chave do operador inválida." : "Configure RHEO_STUDIO_KEY para criar salas em produção." });
+      res.status(401).json({ error: "Chave do operador inválida." });
       return;
     }
     if (req.headers.origin && req.headers.origin !== expectedOrigin(req)) {
