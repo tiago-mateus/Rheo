@@ -154,7 +154,7 @@ export default function MultiStudio() {
         {rooms.length < 3 && (
           <form className="room-setup multi-setup" onSubmit={create}>
             <h2>Adicionar {names.find((candidate) => !rooms.some((room) => room.name === candidate)) || names[rooms.length]}</h2>
-            <label htmlFor="multi-key">Chave do operador (obrigatória em produção)</label>
+            <label htmlFor="multi-key">Chave do operador (quando configurada)</label>
             <input id="multi-key" type="password" autoComplete="off" value={studioKey}
               onChange={(e) => setStudioKey(e.target.value)} placeholder="Chave definida no servidor" />
             <FormatFields value={format} onChange={setFormat} />
