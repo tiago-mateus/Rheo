@@ -64,10 +64,6 @@ export function createBackend(options: { publicOrigin?: string; studioKey?: stri
   app.get("/api/health", (_req, res) => res.json({ ok: true }));
   app.use(express.json({ limit: "4kb" }));
   app.post("/api/sessions", (req, res) => {
-    if (!authorizedCreator(req.headers["x-rheo-studio-key"])) {
-      res.status(401).json({ error: "Chave do operador inválida." });
-      return;
-    }
     if (req.headers.origin && req.headers.origin !== expectedOrigin(req)) {
       res.status(403).json({ error: "Origem não permitida." });
       return;
@@ -81,6 +77,10 @@ export function createBackend(options: { publicOrigin?: string; studioKey?: stri
     }
     if (++limit.count > 20) {
       res.status(429).json({ error: "Muitas sessões. Aguarde um minuto." });
+      return;
+    }
+    if (!authorizedCreator(req.headers["x-rheo-studio-key"])) {
+      res.status(401).json({ error: "Chave do operador inválida." });
       return;
     }
     try {
