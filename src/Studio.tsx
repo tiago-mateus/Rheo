@@ -4,6 +4,7 @@ import { defaultFormat, validFormat, type VideoFormat } from "../shared/video";
 import type { SessionKeys } from "../shared/protocol";
 import FormatFields from "./FormatFields";
 import { obsLink } from "./links";
+import { readStudioKey, saveStudioKey } from "./studioAuth";
 
 type State = {
   format: VideoFormat;
@@ -13,6 +14,7 @@ type State = {
   viewToken: string;
 };
 export default function Studio() {
+  const [studioKey, setStudioKey] = useState(readStudioKey);
   const [id, setId] = useState(
     location.pathname.match(/^\/studio\/([^/]+)/)?.[1] || "",
   );
@@ -115,12 +117,13 @@ export default function Studio() {
     try {
       const response = await fetch("/api/sessions", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-Rheo-Studio-Key": studioKey },
         body: JSON.stringify({ format, managed: true }),
       });
       const data = await response.json();
       if (!response.ok)
         throw new Error(data.error || "Não foi possível criar a sala.");
+      saveStudioKey(studioKey);
       const keys = data as SessionKeys;
       history.pushState(
         null,
@@ -216,6 +219,8 @@ export default function Studio() {
             <div className="setup-layout">
               <form className="room-setup" onSubmit={create}>
                 <h2>Como a imagem deve chegar?</h2>
+                <label htmlFor="studio-key">Chave do operador (obrigatória em produção)</label>
+                <input id="studio-key" type="password" autoComplete="off" value={studioKey} onChange={(e) => setStudioKey(e.target.value)} placeholder="Chave definida no servidor" />
                 <FormatFields value={format} onChange={setFormat} />
                 <label className="lan-option" htmlFor="studio-lan-only">
                   <input
@@ -241,6 +246,7 @@ export default function Studio() {
                 <button className="primary full" disabled={busy}>
                   {busy ? "Criando sala…" : "Criar sala para OBS"}
                 </button>
+                <a className="camera-start" href="/multi">Gerenciar até três câmeras</a>
                 <a className="camera-start" href="/?camera=1">
                   Quero transmitir pelo celular
                 </a>
