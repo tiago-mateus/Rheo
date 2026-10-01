@@ -5,8 +5,9 @@ import type { SessionKeys } from "../shared/protocol";
 import FormatFields from "./FormatFields";
 import { obsLink } from "./links";
 import { readStudioKey, saveStudioKey } from "./studioAuth";
+import { cameraQualityQuery, type ImageQuality } from "./imageQuality";
 
-type CameraRoom = SessionKeys & { name: string; format: VideoFormat; lanOnly: boolean };
+type CameraRoom = SessionKeys & { name: string; format: VideoFormat; lanOnly: boolean; imageQuality?: ImageQuality };
 type Connection = { senderConnected: boolean; viewerConnected: boolean; expired?: boolean };
 const storageKey = "rheo-multicamera-v1";
 const names = ["Câmera 1", "Câmera 2", "Câmera 3"];
@@ -28,6 +29,7 @@ export default function MultiStudio() {
   const [connection, setConnection] = useState<Record<string, Connection>>({});
   const [format, setFormat] = useState<VideoFormat>({ ...defaultFormat });
   const [lanOnly, setLanOnly] = useState(false);
+  const [imageQuality, setImageQuality] = useState<ImageQuality>("maximum");
   const [studioKey, setStudioKey] = useState(readStudioKey);
   const [creating, setCreating] = useState(false);
   const [working, setWorking] = useState("");
@@ -42,7 +44,7 @@ export default function MultiStudio() {
   };
 
   const invite = (room: CameraRoom) =>
-    location.origin + "/send/" + room.id + (room.lanOnly ? "?lan=1" : "") + "#token=" + room.sendToken;
+    location.origin + "/send/" + room.id + cameraQualityQuery(room.imageQuality ?? "maximum", room.lanOnly) + "#token=" + room.sendToken;
   const view = (room: CameraRoom) =>
     obsLink(location.origin + "/view/" + room.id + (room.lanOnly ? "?lan=1" : "") + "#token=" + room.viewToken, true);
   const studio = (room: CameraRoom) =>
@@ -105,7 +107,7 @@ export default function MultiStudio() {
       saveStudioKey(studioKey);
       const keys = data as SessionKeys;
       const name = names.find((candidate) => !rooms.some((room) => room.name === candidate)) || names[rooms.length];
-      const next = [...rooms, { ...keys, name, format: { ...format }, lanOnly }];
+      const next = [...rooms, { ...keys, name, format: { ...format }, lanOnly, imageQuality }];
       save(next);
       setNotice("Sala criada. Compartilhe o convite da câmera e adicione a fonte no OBS.");
     } catch (e) {
@@ -158,6 +160,10 @@ export default function MultiStudio() {
             <input id="multi-key" type="password" autoComplete="off" value={studioKey}
               onChange={(e) => setStudioKey(e.target.value)} placeholder="Chave definida no servidor" />
             <FormatFields value={format} onChange={setFormat} />
+            <label className="lan-option" htmlFor="multi-image-quality">
+              <input id="multi-image-quality" type="checkbox" checked={imageQuality === "maximum"} onChange={(e) => setImageQuality(e.target.checked ? "maximum" : "balanced")} />
+              <span>Priorizar qualidade máxima<small>Full HD, bitrate mais alto e preservação de resolução quando possível.</small></span>
+            </label>
             <label className="lan-option" htmlFor="multi-lan">
               <input id="multi-lan" type="checkbox" checked={lanOnly} onChange={(e) => setLanOnly(e.target.checked)} />
               <span>Somente LAN<small>Celular e OBS na mesma rede, sem rota de mídia via TURN.</small></span>
@@ -174,7 +180,7 @@ export default function MultiStudio() {
             return (
               <article className="multi-card" key={room.id}>
                 <div className="multi-card-heading">
-                  <div><h2>{room.name}</h2><small>{room.format.width} × {room.format.height} · {room.lanOnly ? "LAN" : "WebRTC"}</small></div>
+                  <div><h2>{room.name}</h2><small>{room.format.width} × {room.format.height} · {room.imageQuality === "balanced" ? "Equilibrado" : "Máxima qualidade"} · {room.lanOnly ? "LAN" : "WebRTC"}</small></div>
                   <span className={status?.expired ? "multi-bad" : status?.senderConnected ? "multi-ok" : "multi-idle"}>
                     {status?.expired ? "Expirada" : status?.senderConnected ? "Câmera conectada" : "Aguardando câmera"}
                   </span>
