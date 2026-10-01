@@ -343,7 +343,7 @@ export default function App() {
           height: { ideal: format.height },
           frameRate: { ideal: 30, max: 30 },
           // Avoid browser software resize where the capture device supports it.
-          ...(navigator.mediaDevices.getSupportedConstraints?.().resizeMode
+          ...((navigator.mediaDevices.getSupportedConstraints?.() as (MediaTrackSupportedConstraints & { resizeMode?: boolean }) | undefined)?.resizeMode
             ? { resizeMode: "none" as const }
             : {}),
           ...(camera
