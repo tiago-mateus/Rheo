@@ -162,7 +162,7 @@ export default function MultiStudio() {
             <FormatFields value={format} onChange={setFormat} />
             <label className="lan-option" htmlFor="multi-image-quality">
               <input id="multi-image-quality" type="checkbox" checked={imageQuality === "maximum"} onChange={(e) => setImageQuality(e.target.checked ? "maximum" : "balanced")} />
-              <span>Priorizar qualidade máxima<small>Full HD, bitrate mais alto e preservação de resolução quando possível.</small></span>
+              <span>Priorizar qualidade máxima<small>Full HD e bitrate mais alto quando a rede permitir.</small></span>
             </label>
             <label className="lan-option" htmlFor="multi-lan">
               <input id="multi-lan" type="checkbox" checked={lanOnly} onChange={(e) => setLanOnly(e.target.checked)} />
