@@ -12,7 +12,7 @@ test("sala somente LAN compartilha a restrição no convite e no OBS", async ({
     /\?lan=1#token=/,
   );
   await expect(page.getByLabel("Link para OBS")).toHaveValue(
-    /\?lan=1&clean=1&latency=low#token=/,
+    /\?lan=1&clean=1#token=/,
   );
   await page.reload();
   await expect(page.getByLabel("Convite da câmera")).toHaveValue(

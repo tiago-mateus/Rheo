@@ -87,7 +87,7 @@ test("formatos predefinidos e personalizados cabem no celular", async ({
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
   await page.getByLabel("Formato", { exact: true }).selectOption("portrait");
-  await page.getByLabel("Resolução").selectOption("1080");
+  await page.getByLabel("Resolução", { exact: true }).selectOption("1080");
   await page.screenshot({
     path: "test-results/studio-setup-mobile.png",
     fullPage: true,

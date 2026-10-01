@@ -7,6 +7,7 @@ import { defaultFormat, type VideoFormat } from "../shared/video";
 import { frameCamera } from "./capture";
 import FormatFields from "./FormatFields";
 import { readStudioKey, saveStudioKey } from "./studioAuth";
+import { cameraQualityQuery, imageQualityFromSearch, type ImageQuality } from "./imageQuality";
 type Route = { role: Role; id: string; token: string };
 function currentRoute(): Route | null {
   const match = location.pathname.match(
@@ -78,6 +79,8 @@ export default function App() {
   });
   const [hasTurn, setHasTurn] = useState<boolean | null>(null);
   const [stats, setStats] = useState<Stats>({});
+  const [cameraSettings, setCameraSettings] = useState<MediaTrackSettings | null>(null);
+  const [imageQuality, setImageQuality] = useState<ImageQuality>(() => imageQualityFromSearch(location.search));
   const [audioBlocked, setAudioBlocked] = useState(false);
   const [previewBlocked, setPreviewBlocked] = useState(false);
   const [muted, setMuted] = useState(false);
@@ -142,6 +145,7 @@ export default function App() {
     setActive(false);
     setEnded(true);
     setStatus("Encerrada");
+    setCameraSettings(null);
     setNotice("Transmissão encerrada.");
     setAudioBlocked(false);
   }
@@ -302,7 +306,7 @@ export default function App() {
         "",
         "/send/" +
           keys.id +
-          (lanOnly ? "?lan=1" : "") +
+          cameraQualityQuery(imageQuality, lanOnly) +
           "#token=" +
           keys.sendToken,
       );
@@ -331,12 +335,17 @@ export default function App() {
     local.current?.getTracks().forEach((t) => t.stop());
     local.current = null;
     setPrepared(false);
+    setCameraSettings(null);
     try {
       const raw = await navigator.mediaDevices.getUserMedia({
         video: {
           width: { ideal: format.width },
           height: { ideal: format.height },
           frameRate: { ideal: 30, max: 30 },
+          // Avoid browser software resize where the capture device supports it.
+          ...((navigator.mediaDevices.getSupportedConstraints?.() as (MediaTrackSupportedConstraints & { resizeMode?: boolean }) | undefined)?.resizeMode
+            ? { resizeMode: "none" as const }
+            : {}),
           ...(camera
             ? { deviceId: { exact: camera } }
             : { facingMode: "environment" }),
@@ -350,8 +359,15 @@ export default function App() {
                 ...(microphone ? { deviceId: { exact: microphone } } : {}),
               },
       });
+      const actual = raw.getVideoTracks()[0]?.getSettings();
+      setCameraSettings(actual ?? null);
       capture.current = await frameCamera(raw, format);
       const stream = capture.current.stream;
+      if (imageQuality === "maximum")
+        for (const videoTrack of stream.getVideoTracks())
+          videoTrack.contentHint = "detail";
+      if (actual?.width && actual?.height && actual.width * actual.height < format.width * format.height)
+        setNotice(`A câmera entregou ${actual.width} × ${actual.height}, abaixo da saída ${format.width} × ${format.height}. O enquadramento não cria detalhes que a câmera não capturou.`);
       stream.getAudioTracks().forEach((track) => {
         track.enabled = !muted;
       });
@@ -653,6 +669,10 @@ export default function App() {
                   <dt>Modo</dt>
                   <dd>{lanOnly ? "Somente LAN" : "Automático"}</dd>
                 </div>
+                {!receiver && <div>
+                  <dt>Captura real</dt>
+                  <dd>{cameraSettings?.width && cameraSettings?.height ? `${cameraSettings.width} × ${cameraSettings.height}${cameraSettings.frameRate ? " · " + Math.round(cameraSettings.frameRate) + " FPS" : ""}` : "—"}</dd>
+                </div>}
                 <div>
                   <dt>Conexão</dt>
                   <dd>{stats.route || "—"}</dd>
@@ -675,6 +695,18 @@ export default function App() {
                       : "—"}
                   </dd>
                 </div>
+                <div>
+                  <dt>Codec de vídeo</dt>
+                  <dd>{stats.codec || "—"}</dd>
+                </div>
+                {!receiver && <div>
+                  <dt>Limite solicitado</dt>
+                  <dd>{stats.bitrateCeilingKbps ? (stats.bitrateCeilingKbps / 1000).toFixed(1) + " Mbps" : "—"}</dd>
+                </div>}
+                {stats.framesDropped !== undefined && <div>
+                  <dt>Quadros descartados</dt>
+                  <dd>{stats.framesDropped}</dd>
+                </div>}
                 <div>
                   <dt>RTT de rede</dt>
                   <dd>{stats.rtt !== undefined ? stats.rtt + " ms" : "—"}</dd>
@@ -752,6 +784,10 @@ export default function App() {
                   {!route ? (
                     <>
                       <FormatFields value={format} onChange={setFormat} />
+                      <label className="lan-option" htmlFor="standalone-image-quality">
+                        <input id="standalone-image-quality" type="checkbox" checked={imageQuality === "maximum"} onChange={(e) => setImageQuality(e.target.checked ? "maximum" : "balanced")} />
+                        <span>Priorizar qualidade máxima<small>Prefere preservar resolução; requer rede e câmera capazes de acompanhar.</small></span>
+                      </label>
                       <label className="lan-option" htmlFor="lan-only">
                         <input
                           id="lan-only"
@@ -774,6 +810,8 @@ export default function App() {
                       <span>Formato de saída</span>
                       <strong>
                         {format.width} × {format.height} / 30 fps
+                        <br />
+                        {imageQuality === "maximum" ? "Qualidade máxima" : "Modo equilibrado"}
                       </strong>
                     </div>
                   )}

@@ -5,6 +5,7 @@ import type {
   Signal,
 } from "../shared/protocol";
 import { isLanCandidate, lanDescription, mediaRoute } from "./network";
+import { imageQualityFromSearch, videoBitrateKbps } from "./imageQuality";
 export interface Stats {
   bitrate?: number;
   fps?: number;
@@ -12,6 +13,10 @@ export interface Stats {
   route?: string;
   resolution?: string;
   lost?: number;
+  codec?: string;
+  framesDropped?: number;
+  qualityLimitationReason?: string;
+  bitrateCeilingKbps?: number;
 }
 interface Callbacks {
   status: (text: string) => void;
@@ -144,6 +149,10 @@ export class RtcSession {
       this.callbacks.status("Conectando mídia…");
       if (this.role === "sender") {
         await pc.setLocalDescription(await pc.createOffer());
+        if (this.pc === pc) await Promise.all(
+          pc.getSenders().filter((sender) => sender.track?.kind === "video")
+            .map((sender) => this.applyVideoBitrate(sender)),
+        );
         if (this.pc === pc)
           this.send({
             type: "description",
@@ -214,30 +223,43 @@ export class RtcSession {
     }
   }
   private async applyVideoBitrate(sender: RTCRtpSender) {
+    const track = sender.track;
+    if (!track) return;
+    const settings = track.getSettings();
+    const requested = videoBitrateKbps(
+      settings.width ?? 1280,
+      settings.height ?? 720,
+      imageQualityFromSearch(location.search),
+      location.search,
+    );
     try {
-      const track = sender.track;
-      if (!track) return;
-      const settings = track.getSettings();
-      const pixels = (settings.width || 1280) * (settings.height || 720);
-      const defaultKbps = pixels > 1280 * 720 ? 4500 : pixels > 640 * 480 ? 2500 : 1200;
-      // Optional URL override for a camera invitation: ?bitrate=1800 (kbps).
-      // Bounds protect against unusably low or unexpectedly high values.
-      const requested = new URLSearchParams(location.search).get("bitrate");
-      const parsed = requested === null ? NaN : Number(requested);
-      const kbps = Number.isFinite(parsed) && parsed >= 300 && parsed <= 8000
-        ? parsed
-        : defaultKbps;
       const parameters = sender.getParameters();
       if (!parameters.encodings?.length) return;
       parameters.encodings = parameters.encodings.map((encoding) => ({
         ...encoding,
-        maxBitrate: Math.round(kbps * 1000),
+        maxBitrate: requested * 1000,
+        scaleResolutionDownBy: 1,
       }));
+      if (imageQualityFromSearch(location.search) === "maximum")
+        parameters.degradationPreference = "maintain-resolution";
       await sender.setParameters(parameters);
     } catch {
-      // Some browsers reject encoder preferences. Keep WebRTC functioning.
+      // Some implementations reject degradationPreference or custom bitrates.
+      // Transmission must work even when manual encoder controls are unsupported.
+      try {
+        const fallback = sender.getParameters();
+        if (!fallback.encodings?.length) return;
+        fallback.encodings = fallback.encodings.map((encoding) => ({
+          ...encoding,
+          maxBitrate: requested * 1000,
+        }));
+        await sender.setParameters(fallback);
+      } catch {
+        /* The browser will use its own congestion-control policy. */
+      }
     }
   }
+
   private createPeer() {
     this.closePeer();
     this.iceAttempts = 0;
@@ -255,12 +277,7 @@ export class RtcSession {
       }, 15000);
     if (this.stream)
       for (const track of this.stream.getTracks()) {
-        const sender = pc.addTrack(track, this.stream);
-        if (track.kind === "video") {
-          // A bitrate cap is an upper bound, not a guaranteed network rate.
-          // Unsupported browsers should continue with their default encoder.
-          void this.applyVideoBitrate(sender);
-        }
+        pc.addTrack(track, this.stream);
       }
     pc.onicecandidate = (event) => {
       if (
@@ -375,6 +392,23 @@ export class RtcSession {
           if (report.frameWidth)
             result.resolution = report.frameWidth + " × " + report.frameHeight;
           result.lost = report.packetsLost;
+          if (report.codecId) {
+            const codec = stats.get(report.codecId);
+            if (codec?.mimeType) result.codec = codec.mimeType;
+          }
+          if (typeof report.framesDropped === "number")
+            result.framesDropped = report.framesDropped;
+          if (typeof report.qualityLimitationReason === "string")
+            result.qualityLimitationReason = report.qualityLimitationReason;
+          if (this.role === "sender" && this.stream) {
+            const current = this.stream.getVideoTracks()[0]?.getSettings();
+            result.bitrateCeilingKbps = videoBitrateKbps(
+              current?.width ?? 1280,
+              current?.height ?? 720,
+              imageQualityFromSearch(location.search),
+              location.search,
+            );
+          }
         }
         if (report.type === "transport" && report.selectedCandidatePairId) {
           const pair = stats.get(report.selectedCandidatePairId);
