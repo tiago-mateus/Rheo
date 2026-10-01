@@ -1,5 +1,5 @@
 import express from "express";
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash, timingSafeEqual } from "node:crypto";
 import type { Server, IncomingMessage } from "node:http";
 import { WebSocket, WebSocketServer } from "ws";
 import { SessionStore } from "./sessions.js";
@@ -14,7 +14,7 @@ type Client = {
   alive: boolean;
   resumeKey?: string;
 };
-export function createBackend(options: { publicOrigin?: string } = {}) {
+export function createBackend(options: { publicOrigin?: string; studioKey?: string; persistencePath?: string } = {}) {
   // Render terminates TLS before forwarding HTTP to this process.
   // Pin the public origin instead of trusting client-supplied forwarded headers.
   const configuredOrigin =
@@ -29,7 +29,21 @@ export function createBackend(options: { publicOrigin?: string } = {}) {
     ("encrypted" in req.socket ? "https" : "http") + "://" + req.headers.host;
   const app = express();
   app.disable("x-powered-by");
-  const store = new SessionStore();
+  // Enable only when deployed behind a trusted single-hop reverse proxy.
+  app.set("trust proxy", process.env.RHEO_TRUST_PROXY === "1" ? 1 : false);
+  const studioKey = options.studioKey ?? process.env.RHEO_STUDIO_KEY;
+  if (studioKey && studioKey.length < 24)
+    throw new Error("RHEO_STUDIO_KEY deve ter no mínimo 24 caracteres.");
+  const store = new SessionStore(Date.now, 4 * 60 * 60 * 1000, options.persistencePath ?? process.env.RHEO_SESSION_FILE);
+  if (!studioKey && process.env.NODE_ENV === "production")
+    console.warn("Rheo: RHEO_STUDIO_KEY ausente; criação de salas permanece pública. Configure a chave no Render.");
+  const authorizedCreator = (supplied: unknown) => {
+    if (!studioKey) return true;
+    if (typeof supplied !== "string" || supplied.length > 1024) return false;
+    const expected = createHash("sha256").update(studioKey).digest();
+    const actual = createHash("sha256").update(supplied).digest();
+    return timingSafeEqual(actual, expected);
+  };
   const wss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024 });
   const clients = new Map<string, Client>();
   const limits = new Map<string, { count: number; until: number }>();
@@ -54,7 +68,7 @@ export function createBackend(options: { publicOrigin?: string } = {}) {
       res.status(403).json({ error: "Origem não permitida." });
       return;
     }
-    const ip = req.socket.remoteAddress || "local";
+    const ip = req.ip || "local";
     const now = Date.now();
     let limit = limits.get(ip);
     if (!limit || limit.until < now) {
@@ -63,6 +77,10 @@ export function createBackend(options: { publicOrigin?: string } = {}) {
     }
     if (++limit.count > 20) {
       res.status(429).json({ error: "Muitas sessões. Aguarde um minuto." });
+      return;
+    }
+    if (!authorizedCreator(req.headers["x-rheo-studio-key"])) {
+      res.status(401).json({ error: "Chave do operador inválida." });
       return;
     }
     try {

@@ -1,5 +1,13 @@
 # Rheo
 
+## Central de até três câmeras
+
+Abra **/multi** no computador operador. Crie até três salas independentes, envie um convite para cada celular e adicione uma fonte **Navegador** no OBS para cada sala. O painel mostra presença dos transmissores e ocupação de cada receptor, permite liberar receptores e encerrar salas. A prévia ocupa a vaga daquele receptor: feche a prévia antes de ativar sua fonte no OBS. Guarde o link de cada painel individual, pois a lista da central é armazenada somente nesta aba (`sessionStorage`). A central não mistura vídeos nem substitui o mixer/controle de cenas do OBS. Não há SFU; cada sala continua com um transmissor e um receptor.
+
+**Segurança:** em implantação pública, configure `RHEO_STUDIO_KEY` (mínimo de 24 caracteres) e informe essa chave no formulário de criação. Com a chave definida, a criação de salas exige credencial. Para manter instalações anteriores funcionando, sem chave configurada a API permanece pública e limitada por IP; veja [configuração Render](docs/render.md).
+
+**Recuperação:** `RHEO_SESSION_FILE=.local/sessions.json` permite restaurar credenciais de salas ainda válidas após reiniciar uma instalação de instância única com disco persistente. Conexões de mídia e WebSocket precisam se restabelecer. **O Render Free não oferece disco persistente**, portanto não use esse mecanismo como garantia de recuperação de salas nessa hospedagem.
+
 ## Começar pelo computador do OBS
 
 1. Abra o Rheo, escolha formato (horizontal, vertical, quadrado ou personalizado), resolução e enquadramento. Clique em **Criar sala para OBS**.
@@ -14,7 +22,13 @@ O endereço `/studio/…` é privado do operador. Compartilhe apenas o convite `
 
 O formato é definido ao criar a sala: 720p, 1080p ou dimensões personalizadas pares (240–1920 por eixo, até 2.073.600 pixels). A saída mantém essas dimensões quando o celular gira. **Imagem inteira** acrescenta barras quando necessário; **Preencher** corta as bordas. Nenhum modo estica a imagem. Para uma cena horizontal ampla, filme com o celular deitado.
 
-O enquadramento usa canvas no aparelho que filma, preservando o áudio original. Isso usa processamento/bateria do celular; não melhora os detalhes de uma câmera de resolução inferior. Mantenha a página em primeiro plano. A qualidade efetivamente recebida ainda depende da rede e do encoder do navegador. Para mudar o formato, crie outra sala. Sessões continuam em memória: reiniciar/deployar o servidor invalida os links.
+O enquadramento usa canvas no aparelho que filma, preservando o áudio original. Isso usa processamento/bateria do celular; não melhora os detalhes de uma câmera de resolução inferior. Mantenha a página em primeiro plano. A qualidade efetivamente recebida ainda depende da rede e do encoder do navegador. Para mudar o formato, crie outra sala. Sem arquivo persistente configurado, reiniciar/deployar o servidor invalida os links.
+
+### Controle de bitrate do transmissor
+
+O Rheo solicita ao navegador um limite máximo de bitrate de vídeo conforme a resolução capturada: 1.200 kbps para resoluções pequenas, 2.500 kbps até 720p e 4.500 kbps acima de 720p. São limites máximos, não velocidades garantidas; a rede e o controle de congestionamento do WebRTC podem escolher valores menores.
+
+Para testar outro limite, adicione `bitrate=1800` ao **convite da câmera** (kbps, entre 300 e 8000), antes do fragmento `#token=...`. Exemplo: `/send/ID?bitrate=1800#token=TOKEN`. Se já existir `?lan=1`, use `?lan=1&bitrate=1800`. O ajuste depende do suporte do navegador a `RTCRtpSender.setParameters()`; se não for suportado, o Rheo usa a configuração automática padrão. A alteração afeta apenas a câmera que abrir o convite modificado.
 
 ### Controle de bitrate do transmissor
 

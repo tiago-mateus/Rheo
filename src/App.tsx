@@ -6,6 +6,7 @@ import SessionNotice from "./SessionNotice";
 import { defaultFormat, type VideoFormat } from "../shared/video";
 import { frameCamera } from "./capture";
 import FormatFields from "./FormatFields";
+import { readStudioKey, saveStudioKey } from "./studioAuth";
 type Route = { role: Role; id: string; token: string };
 function currentRoute(): Route | null {
   const match = location.pathname.match(
@@ -46,6 +47,7 @@ function CameraIcon() {
   );
 }
 export default function App() {
+  const [studioKey, setStudioKey] = useState(readStudioKey);
   const [route, setRoute] = useState(currentRoute);
   const [status, setStatus] = useState("Pronto para começar");
   const [accessIssue, setAccessIssue] = useState<AccessIssue | null>(() => {
@@ -284,12 +286,13 @@ export default function App() {
     try {
       const response = await fetch("/api/sessions", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-Rheo-Studio-Key": studioKey },
         body: JSON.stringify({ format }),
       });
       const data = await response.json();
       if (!response.ok)
         throw new Error(data.error || "Não foi possível criar a sessão.");
+      saveStudioKey(studioKey);
       const keys = data as SessionKeys;
       try {
         sessionStorage.setItem("rheo-view-" + keys.id, keys.viewToken);
@@ -588,6 +591,9 @@ export default function App() {
                     : "Câmera e microfone desligados"}
               </span>
               <div className="transport-actions">
+                {!route && (
+                  <label htmlFor="standalone-studio-key">Chave do operador <input id="standalone-studio-key" type="password" autoComplete="off" value={studioKey} onChange={(e) => setStudioKey(e.target.value)} placeholder="Se configurada no servidor" /></label>
+                )}
                 {!route && (
                   <button className="primary" disabled={busy} onClick={create}>
                     {busy ? "Criando…" : "Criar transmissão"}

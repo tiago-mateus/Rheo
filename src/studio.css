@@ -255,3 +255,48 @@
     flex-wrap: wrap;
   }
 }
+
+/* Three independent OBS feeds share one operator dashboard. */
+.multi-operator { max-width: 1500px; }
+.multi-setup { max-width: 480px; margin-bottom: 38px; }
+.multi-setup .primary { margin-top: 16px; }
+.multi-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  align-items: start;
+}
+.multi-card {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 20px;
+  background: var(--surface, #141b19);
+}
+.multi-card-heading, .multi-card-stats, .multi-card-actions, .multi-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.multi-card-heading { margin-bottom: 18px; align-items: flex-start; }
+.multi-card-heading h2 { margin: 0 0 6px; }
+.multi-card-heading small { color: var(--muted); }
+.multi-card-heading > span {
+  font-size: 11px;
+  padding: 6px 9px;
+  border-radius: 20px;
+  background: #323a36;
+}
+.multi-card-heading .multi-ok { color: #a1dfa7; }
+.multi-card-heading .multi-bad { color: #ffb4a9; }
+.multi-card-stats { font-size: 12px; color: var(--muted); border-block: 1px solid var(--line); padding: 10px 0; }
+.multi-card .multi-qr { display: block; margin: 18px auto 4px; }
+.multi-card input { min-width: 0; width: 100%; }
+.multi-card button { margin-top: 9px; }
+.multi-card-actions, .multi-card-footer { margin-top: 14px; }
+.multi-card-actions button, .multi-card-footer button { flex: 1; min-width: 128px; }
+.multi-card iframe { margin-top: 14px; background: #000; }
+@media (max-width: 1140px) { .multi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .multi-grid { grid-template-columns: 1fr; } }
