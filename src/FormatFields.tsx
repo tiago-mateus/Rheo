@@ -9,7 +9,7 @@ export default function FormatFields({
   onChange: (value: VideoFormat) => void;
 }) {
   const [preset, setPreset] = useState("landscape");
-  const [quality, setQuality] = useState("720");
+  const [quality, setQuality] = useState(value.width >= 1920 || value.height >= 1920 ? "1080" : "720");
   function choose(shape: string, size: string) {
     setPreset(shape);
     setQuality(size);
